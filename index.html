@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FROST Admin" />
+  <meta name="theme-color" content="#050c14" />
+  <title>FROST — Canlı Yönetim, Destek, DM & Hesap Paneli</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #050c14;
+      --surface: #0c1926;
+      --surface2: #122538;
+      --border: rgba(125, 211, 252, 0.16);
+      --cold: #7dd3fc;
+      --cold-dark: #0284c7;
+      --ink: #f0f7fa;
+      --ink2: #8ca5b5;
+      --green: #34d399;
+      --danger: #fb7185;
+      --amber: #fbbf24;
+      --purple: #c084fc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--ink); min-height: 100vh; }
+
+    /* Top Header */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(5, 12, 20, 0.9); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-badge {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, #7dd3fc, #0284c7);
+      color: #041019; font-weight: 900; font-size: 21px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand h1 { font-size: 18px; font-weight: 900; letter-spacing: 1.4px; }
+    .brand span { font-size: 12px; color: var(--cold); font-weight: 600; display: block; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); display: inline-block; margin-right: 6px; }
+    .btn {
+      background: var(--surface2); color: var(--ink); border: 1px solid var(--border);
+      padding: 8px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+      cursor: pointer; transition: 0.15s; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+    }
+    .btn:hover { border-color: var(--cold); background: rgba(125, 211, 252, 0.14); }
+    .btn-primary { background: var(--cold); color: #041019; border-color: var(--cold); font-weight: 800; }
+    .btn-primary:hover { background: #bae6fd; }
+    .btn-green { background: rgba(52, 211, 153, 0.18); color: var(--green); border-color: rgba(52, 211, 153, 0.45); }
+    .btn-danger { border-color: rgba(251, 113, 133, 0.4); color: var(--danger); }
+    .btn-danger:hover { background: rgba(251, 113, 133, 0.15); }
+
+    /* Container */
+    .container { max-width: 1480px; margin: 0 auto; padding: 20px 26px 64px; }
+
+    /* KPI Row */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .kpi-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+      padding: 15px 17px; cursor: pointer; transition: 0.15s;
+    }
+    .kpi-card:hover { border-color: var(--cold); transform: translateY(-1px); }
+    .kpi-label { font-size: 11px; font-weight: 800; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.7px; }
+    .kpi-val { font-size: 27px; font-weight: 900; margin-top: 5px; color: var(--ink); }
+    .kpi-sub { font-size: 11.5px; color: var(--cold); margin-top: 4px; font-weight: 600; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .tab-btn {
+      background: var(--surface); color: var(--ink2); border: 1px solid var(--border);
+      padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 7px; transition: 0.14s;
+    }
+    .tab-btn:hover { border-color: var(--cold); color: var(--ink); }
+    .tab-btn.active { background: var(--cold); color: #041019; border-color: var(--cold); }
+    .tab-count {
+      padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 900;
+      background: rgba(255,255,255,0.12); color: inherit;
+    }
+    .tab-btn.active .tab-count { background: rgba(4, 16, 25, 0.2); color: #041019; }
+    .tab-alert { background: #ef4444 !important; color: #fff !important; }
+
+    /* Split Chat / Ticket Inspector */
+    .chat-layout { display: grid; grid-template-columns: 400px 1fr; gap: 18px; min-height: 600px; }
+    @media (max-width: 980px) { .chat-layout { grid-template-columns: 1fr; } }
+    .panel-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; }
+    .panel-head { padding: 13px 17px; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: rgba(18, 37, 56, 0.45); }
+    .thread-list { overflow-y: auto; max-height: 640px; }
+    .thread-item {
+      padding: 13px 16px; border-bottom: 1px solid rgba(125,211,252,0.08); cursor: pointer;
+      display: flex; align-items: center; gap: 12px; transition: 0.12s;
+    }
+    .thread-item:hover, .thread-item.active { background: rgba(125, 211, 252, 0.13); }
+    .avatar-pair { display: flex; align-items: center; flex-shrink: 0; }
+    .avatar-sm { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg); background: var(--surface2); }
+    .avatar-sm + .avatar-sm { margin-left: -12px; }
+
+    .badge { padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; display: inline-block; white-space: nowrap; }
+    .badge-real { background: rgba(52, 211, 153, 0.18); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.4); }
+    .badge-seed { background: rgba(125, 211, 252, 0.12); color: var(--cold); border: 1px solid rgba(125, 211, 252, 0.25); }
+    .badge-fake { background: rgba(192, 132, 252, 0.16); color: var(--purple); border: 1px solid rgba(192, 132, 252, 0.38); }
+    .badge-pro { background: rgba(251, 191, 36, 0.18); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge-urgent { background: rgba(251, 113, 133, 0.22); color: var(--danger); border: 1px solid rgba(251, 113, 133, 0.5); }
+
+    .messages-area { flex: 1; padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: 520px; }
+    .msg-bubble { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.45; }
+    .msg-a { align-self: flex-start; background: var(--surface2); border: 1px solid var(--border); }
+    .msg-b { align-self: flex-end; background: rgba(125, 211, 252, 0.2); border: 1px solid rgba(125, 211, 252, 0.42); }
+    .msg-admin { align-self: flex-end; background: rgba(52, 211, 153, 0.18); border: 1px solid rgba(52, 211, 153, 0.45); }
+    .msg-sys { align-self: center; background: rgba(255,255,255,0.05); color: var(--cold); font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 14px; text-align: center; }
+    .msg-sender { font-size: 11px; font-weight: 800; color: var(--cold); margin-bottom: 3px; display: flex; justify-content: space-between; gap: 10px; }
+    .msg-time { font-size: 10.5px; color: var(--ink2); font-weight: 600; margin-top: 4px; text-align: right; }
+
+    .reply-bar { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: var(--surface2); flex-wrap: wrap; }
+    .input {
+      background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+      border-radius: 12px; padding: 9px 13px; font-size: 13px; outline: none;
+    }
+    .input:focus { border-color: var(--cold); }
+
+    /* Filter Bar & User Cards */
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; background: var(--surface); padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); }
+    .user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(355px, 1fr)); gap: 14px; }
+    .user-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 15px; display: flex; flex-direction: column; gap: 11px; transition: 0.14s; }
+    .user-card:hover { border-color: rgba(125, 211, 252, 0.36); }
+    .user-top { display: flex; gap: 12px; align-items: center; }
+    .avatar-lg { width: 62px; height: 62px; border-radius: 16px; object-fit: cover; background: var(--surface2); border: 1px solid var(--border); flex-shrink: 0; }
+    .meta-pills { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; color: var(--ink2); }
+    .meta-pill { background: var(--bg); border: 1px solid var(--border); padding: 4px 8px; border-radius: 8px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid rgba(125,211,252,0.09); font-size: 13px; }
+    th { color: var(--ink2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; background: rgba(18, 37, 56, 0.45); }
+    .like-arrow { color: var(--cold); font-weight: 900; font-size: 14px; padding: 0 6px; }
+
+    /* User Activity Inspector Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(2, 8, 15, 0.8); backdrop-filter: blur(8px);
+      z-index: 150; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
+      width: 100%; max-width: 920px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+    }
+    .modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+    .photo-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+    .photo-strip img { width: 92px; height: 118px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); }
+
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--cold); color: #041019;
+      padding: 12px 20px; border-radius: 14px; font-weight: 800; font-size: 13.5px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45); display: none; z-index: 300;
+    }
+
+    /* Mobile Phone & Tablet Responsiveness */
+    @media (max-width: 768px) {
+      header { padding: 12px 14px; }
+      .brand h1 { font-size: 15px; }
+      .brand span { font-size: 11px; }
+      .container { padding: 14px 12px 54px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .kpi-val { font-size: 22px; }
+      .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
+      .tab-btn { white-space: nowrap; flex-shrink: 0; padding: 9px 13px; font-size: 12px; }
+      .user-grid { grid-template-columns: 1fr; }
+      .filter-bar .input { min-width: 100% !important; width: 100%; }
+      .panel-box { overflow-x: auto; }
+    }
+
+    /* Admin Security Lock Screen */
+    #adminLockScreen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: radial-gradient(circle at top, #0f253a 0%, #050c14 70%);
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .lock-card {
+      width: 100%; max-width: 380px; background: var(--surface);
+      border: 1px solid rgba(125, 211, 252, 0.28); border-radius: 24px;
+      padding: 28px 24px; text-align: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    }
+  </style>
+</head>
+<body>
+  <!-- Security Gate for Remote / Phone Access -->
+  <div id="adminLockScreen">
+    <div class="lock-card">
+      <div class="brand-badge" style="width: 54px; height: 54px; font-size: 26px; margin: 0 auto 14px; border-radius: 16px;">❄</div>
+      <h2 style="font-size: 19px; font-weight: 900; margin-bottom: 6px;">FROST ADMIN PANELİ</h2>
+      <p style="font-size: 12.5px; color: var(--ink2); margin-bottom: 18px; line-height: 1.5;">
+        Canlı yönetim ve destek paneline erişmek için yönetici şifresini girin.
+      </p>
+      <input
+        id="adminPinInput"
+        type="password"
+        class="input"
+        style="width: 100%; text-align: center; font-size: 15px; padding: 12px; margin-bottom: 12px;"
+        placeholder="Yönetici Şifresi..."
+        onkeydown="if(event.key==='Enter') unlockAdminPanel()"
+      />
+      <div id="adminPinError" style="color: var(--danger); font-size: 12px; font-weight: 700; margin-bottom: 10px; display: none;">
+        Hatalı şifre! Lütfen tekrar deneyin.
+      </div>
+      <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;" onclick="unlockAdminPanel()">
+        Panele Giriş Yap →
+      </button>
+    </div>
+  </div>
+  <header>
+    <div class="brand">
+      <div class="brand-badge">❄</div>
+      <div>
+        <h1>FROST ADMIN & CANLI DESTEK PANELİ</h1>
+        <span>Tüm veriler zamana (en son konuşulan / işlem gören) ve kullanıcıya göre sıralanır • okyanusodabas@hotmail.com</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span style="font-size: 12.5px; color: var(--ink2);"><i class="live-dot"></i><span id="syncStatus">Bağlanıyor...</span></span>
+      <button class="btn btn-primary" onclick="loadAllData()">↻ Şimdi Yenile</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Clickable KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card" onclick="activateTabById('support')">
+        <div class="kpi-label">🎧 Canlı Destek / Ticket</div>
+        <div class="kpi-val" id="kpiSupportTickets">-</div>
+        <div class="kpi-sub" id="kpiSupportSub">Yanıt bekleyen talepler</div>
+      </div>
+      <div class="kpi-card" onclick="activateTabById('real-users')">
+        <div class="kpi-label">👤 Gerçek Kayıtlı Üyeler</div>
+        <div class="kpi-val" id="kpiRealUsers">-</div>
+        <div class="kpi-sub" id="kpiRealSub">Uygulamadan kayıt olanlar</div>
+      </div>
+      <div class="kpi-card" onclick="activateTabById('fake-users')">
+        <div class="kpi-label">🤖 Fake / Sistem Hesapları</div>
+        <div class="kpi-val" id="kpiFakeUsers">-</div>
+        <div class="kpi-sub" id="kpiFakeSplit">Kadın / Erkek @frost.app</div>
+      </div>
+      <div class="kpi-card" onclick="activateTabById('chats')">
+        <div class="kpi-label">💬 Aktif DM / Sohbetler</div>
+        <div class="kpi-val" id="kpiTotalChats">-</div>
+        <div class="kpi-sub" id="kpiTotalMsgs">Son konuşulana göre sıralı</div>
+      </div>
+      <div class="kpi-card" onclick="activateTabById('likes')">
+        <div class="kpi-label">❄️ Gönderilen Beğeniler</div>
+        <div class="kpi-val" id="kpiTotalLikes">-</div>
+        <div class="kpi-sub" id="kpiProSub">VIP & Kar Tanesi trafiği</div>
+      </div>
+    </div>
+
+    <!-- 6 Dedicated Category Tabs -->
+    <div class="tabs">
+      <button class="tab-btn" id="btn-tab-support" onclick="switchTab('support', this)">
+        🎧 Canlı Destek / Ticketlar <span class="tab-count" id="cntSupport">0</span>
+      </button>
+      <button class="tab-btn active" id="btn-tab-real-users" onclick="switchTab('real-users', this)">
+        👤 Gerçek Üyeler <span class="tab-count" id="cntReal">0</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-fake-users" onclick="switchTab('fake-users', this)">
+        🤖 Fake Hesaplar (@frost.app) <span class="tab-count" id="cntFake">0</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-chats" onclick="switchTab('chats', this)">
+        💬 DM & Sohbetler (Zamana Göre) <span class="tab-count" id="cntChats">0</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-likes" onclick="switchTab('likes', this)">
+        ❄️ Beğeniler & Geçmeler <span class="tab-count" id="cntLikes">0</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-reports" onclick="switchTab('reports', this)">
+        🚨 Şikayetler & Engeller <span class="tab-count" id="cntReports">0</span>
+      </button>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 1: LIVE SUPPORT / TICKETS (2-WAY APP + EMAIL SYNC)             -->
+    <!-- ================================================================== -->
+    <div id="tab-support" style="display: none;">
+      <div class="chat-layout">
+        <div class="panel-box">
+          <div class="panel-head">
+            <span>Gelen Destek Talepleri (En Yeni Üstte)</span>
+            <span id="supportCountBadge" class="badge badge-seed">0 Ticket</span>
+          </div>
+          <div class="thread-list" id="supportThreadsList"></div>
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-head" id="activeSupportHeader">
+            <span>Detayları ve cihaz bilgisini görmek için soldan bir destek talebi seçin</span>
+          </div>
+          <div class="messages-area" id="supportMessagesArea">
+            <div style="color: var(--ink2); text-align: center; margin-top: 80px; line-height: 1.6;">
+              Kullanıcılar uygulama içindeki <b>Ayarlar → Canlı Destek & Hata Bildir</b> ekranından yazdığında<br/>
+              hem <b>okyanusodabas@hotmail.com</b> adresine bildirim gider hem de Cihaz ID / İsim / Hesap bilgileriyle buraya düşer.<br/>
+              Buradan yazdığın yanıtlar <b>doğrudan kullanıcının uygulamasına</b> anlık bildirim olarak iletilir!
+            </div>
+          </div>
+          <div class="reply-bar" id="supportReplyBar" style="display: none;">
+            <input id="supportReplyInput" class="input" style="flex: 1; min-width: 240px;" placeholder="Kullanıcının uygulamasına düşecek destek yanıtını yaz..." onkeydown="if(event.key==='Enter') sendAdminSupportReply()" />
+            <button class="btn btn-primary" onclick="sendAdminSupportReply()">Uygulamaya Yanıt Gönder</button>
+            <a id="supportMailtoBtn" class="btn" href="#" target="_blank">📧 Mail İle Yanıtla</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 2: REAL REGISTERED USERS                                       -->
+    <!-- ================================================================== -->
+    <div id="tab-real-users">
+      <div class="filter-bar">
+        <input id="realUserSearch" class="input" style="min-width: 260px; flex: 1;" placeholder="Gerçek üye ara: isim, e-posta, telefon, şehir veya Cihaz ID..." oninput="renderRealUsers()" />
+        <select id="realUserSort" class="input" onchange="renderRealUsers()">
+          <option value="recent_active">Sıralama: Son İşlem / Son Aktif (En Yeni Üstte)</option>
+          <option value="newest_created">Sıralama: Kayıt Tarihi (En Yeni Kayıt Üstte)</option>
+          <option value="most_chats">Sıralama: En Çok Sohbeti Olan</option>
+          <option value="most_likes">Sıralama: En Çok Like Atan</option>
+          <option value="name_az">Sıralama: İsim (A → Z)</option>
+        </select>
+        <select id="realUserGender" class="input" onchange="renderRealUsers()">
+          <option value="all">Tüm Cinsiyetler</option>
+          <option value="Kadın">Kadın</option>
+          <option value="Erkek">Erkek</option>
+        </select>
+      </div>
+      <div class="user-grid" id="realUsersGrid"></div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 3: FAKE / SEED ACCOUNTS (@frost.app) — SEPARATE CATEGORY!      -->
+    <!-- ================================================================== -->
+    <div id="tab-fake-users" style="display: none;">
+      <div class="filter-bar">
+        <input id="fakeUserSearch" class="input" style="min-width: 260px; flex: 1;" placeholder="Fake profil ara: isim (ör. Zeyy, Duru), @frost.app ID veya şehir..." oninput="renderFakeUsers()" />
+        <select id="fakeUserGender" class="input" onchange="renderFakeUsers()">
+          <option value="all">Tümü (Kadın + Erkek Fake Profiller)</option>
+          <option value="Kadın">Sadece Kadın Profiller</option>
+          <option value="Erkek">Sadece Erkek Profiller</option>
+        </select>
+        <select id="fakeUserSort" class="input" onchange="renderFakeUsers()">
+          <option value="most_interacted">Sıralama: Etkileşim Alanlar Üstte (Mesaj / Like Alan)</option>
+          <option value="recent_updated">Sıralama: Son Güncellenen / Eklenen Üstte</option>
+          <option value="name_az">Sıralama: İsim (A → Z)</option>
+        </select>
+      </div>
+      <div class="user-grid" id="fakeUsersGrid"></div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 4: ALL DMs / CONVERSATIONS (CHRONOLOGICALLY SORTED!)           -->
+    <!-- ================================================================== -->
+    <div id="tab-chats" style="display: none;">
+      <div class="filter-bar">
+        <input id="chatSearchInput" class="input" style="min-width: 250px; flex: 1;" placeholder="Kullanıcıya veya mesaj içeriğine göre DM ara..." oninput="renderThreads()" />
+        <select id="chatSortSelect" class="input" onchange="renderThreads()">
+          <option value="latest_msg">Sıralama: En Son Konuşulan Üstte (Zamana Göre)</option>
+          <option value="most_msgs">Sıralama: En Çok Mesaj Olan Üstte</option>
+          <option value="melted_first">Sıralama: Buzu Eriyenler (0°) Üstte</option>
+        </select>
+        <select id="chatScopeSelect" class="input" onchange="renderThreads()">
+          <option value="all">Tüm Sohbetler</option>
+          <option value="real_only">Sadece Gerçek Üye İçeren Sohbetler</option>
+        </select>
+      </div>
+
+      <div class="chat-layout">
+        <div class="panel-box">
+          <div class="panel-head">
+            <span>DM / Sohbet Odaları</span>
+            <span id="threadCountBadge" class="badge badge-seed">0 Oda</span>
+          </div>
+          <div class="thread-list" id="threadsList"></div>
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-head" id="activeChatHeader">
+            <span>Mesajları görmek için soldan bir sohbet seçin</span>
+          </div>
+          <div class="messages-area" id="messagesArea">
+            <div style="color: var(--ink2); text-align: center; margin-top: 80px;">Soldaki listeden bir eşleşme/sohbet seçtiğinde tüm mesaj geçmişi saatleriyle birlikte burada görünür.</div>
+          </div>
+          <div class="reply-bar" id="adminReplyBar" style="display: none;">
+            <select id="replySenderSelect" class="input"></select>
+            <input id="replyMessageInput" class="input" style="flex: 1; min-width: 220px;" placeholder="Seçili kişi adına karşı tarafa canlı mesaj gönder..." onkeydown="if(event.key==='Enter') sendAdminChatReply()" />
+            <button class="btn btn-primary" onclick="sendAdminChatReply()">Gönder</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 5: LIKES & PASSES (CHRONOLOGICAL + USER FILTER)                -->
+    <!-- ================================================================== -->
+    <div id="tab-likes" style="display: none;">
+      <div class="filter-bar">
+        <input id="likeUserSearch" class="input" style="min-width: 250px; flex: 1;" placeholder="Kullanıcıya göre filtrele (gönderen veya hedef isim / e-posta)..." oninput="renderLikes()" />
+        <select id="likeActionFilter" class="input" onchange="renderLikes()">
+          <option value="likes">❄ Sadece Beğeniler (Kar Taneleri)</option>
+          <option value="passes">✕ Sola Kaydırılanlar (Geçilenler)</option>
+        </select>
+        <select id="likeRealFilter" class="input" onchange="renderLikes()">
+          <option value="all">Tüm Hesaplar</option>
+          <option value="real">Sadece Gerçek Üyelerin İşlemleri</option>
+        </select>
+      </div>
+      <div class="panel-box">
+        <div class="panel-head">
+          <span>Beğeni & Kaydırma Geçmişi (En Son İşlem Yapan Üstte)</span>
+          <span id="likesShownBadge" class="badge badge-seed">0 Kayıt</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Son İşlem Zamanı</th>
+                <th>Gönderen Kullanıcı</th>
+                <th>İşlem</th>
+                <th>Hedef Profil</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody id="likesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- TAB 6: REPORTS & BLOCKS                                            -->
+    <!-- ================================================================== -->
+    <div id="tab-reports" style="display: none;">
+      <div class="panel-box">
+        <div class="panel-head"><span>Kullanıcı Şikayetleri (Reports) & Engellemeler (En Yeni Üstte)</span></div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarih / Saat</th>
+                <th>Tür</th>
+                <th>Bildiren / Engelleyen</th>
+                <th>Hedef Hesap</th>
+                <th>Sebep / Detay</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- USER FULL ACTIVITY INSPECTOR MODAL                                   -->
+  <!-- ==================================================================== -->
+  <div class="modal-backdrop" id="inspectorModal" onclick="if(event.target===this) closeInspector()">
+    <div class="modal-box">
+      <div class="panel-head">
+        <span id="inspectorTitle">Kullanıcı Detayı</span>
+        <button class="btn" onclick="closeInspector()">✕ Kapat</button>
+      </div>
+      <div class="modal-body" id="inspectorBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toastBox"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://wilmukejjumnyocelgws.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_7rHR6FUtaJ5glPXPzck3Ow_VYhasbLT';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const ALL_TABS = ['support', 'real-users', 'fake-users', 'chats', 'likes', 'reports'];
+
+    let allProfiles = [];
+    let rawRowsByAccountMap = new Map();
+    let lastAdminSyncIso = null;
+    let profileByKey = new Map();
+    let incomingLikesMap = new Map(); // shortId -> array of sender rows
+    let unifiedThreads = [];
+    let supportThreads = [];
+    let allReports = [];
+    let selectedThreadPairId = null;
+    let selectedSupportAccountId = null;
+
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toastBox');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 2800);
+    }
+
+    function shortIdOf(accId) {
+      return String(accId || '').replace('seed_', '').replace('@frost.app', '').split('@')[0].trim().toLowerCase();
+    }
+
+    function isFakeAccount(row) {
+      const id = String(row.account_id || '').toLowerCase();
+      return id.endsWith('@frost.app');
+    }
+
+    function isHiddenTestAccount(row) {
+      const id = String(row.account_id || '').toLowerCase();
+      return id === 'demo@frost.dating' || id === 'crawlerrobo@gmail.com' || id === 'testfrostuser123@gmail.com';
+    }
+
+    function isRealUser(row) {
+      return !isFakeAccount(row) && !isHiddenTestAccount(row);
+    }
+
+    function cleanPhoto(uri) {
+      if (!uri) return 'https://i.pinimg.com/736x/b3/96/4a/b3964ac7af7d9582c92df6996a5af976.jpg';
+      return String(uri).split('#')[0];
+    }
+
+    // Extract accurate epoch ms from ISO string OR numeric suffix in msg.id (e.g., "me-1794270123456")
+    function parseTimestampMs(isoOrNull, idFallback, rowFallbackIso) {
+      if (isoOrNull) {
+        const t = Date.parse(isoOrNull);
+        if (!Number.isNaN(t) && t > 1000000000000) return t;
+      }
+      if (idFallback) {
+        const m = String(idFallback).match(/(\d{13})/);
+        if (m) {
+          const n = Number(m[1]);
+          if (n > 1000000000000) return n;
+        }
+      }
+      if (rowFallbackIso) {
+        const rt = Date.parse(rowFallbackIso);
+        if (!Number.isNaN(rt)) return rt;
+      }
+      return 0;
+    }
+
+    function formatDateTime(msOrIso) {
+      if (!msOrIso) return '-';
+      const d = typeof msOrIso === 'number' ? new Date(msOrIso) : new Date(msOrIso);
+      if (Number.isNaN(d.getTime()) || d.getTime() <= 0) return '-';
+      const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+      const clock = d.toLocaleString('tr-TR', {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+      if (diffSec >= 0 && diffSec < 60) return `Az önce (${clock})`;
+      if (diffSec >= 60 && diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce (${clock})`;
+      if (diffSec >= 3600 && diffSec < 86400) return `${Math.floor(diffSec / 3600)} sa önce (${clock})`;
+      return clock;
+    }
+
+    function resolveProfile(idOrShort) {
+      const k = String(idOrShort || '').trim().toLowerCase();
+      return profileByKey.get(k) || {
+        account_id: k,
+        display_name: k,
+        photos: [],
+        gender: '?',
+      };
+    }
+
+    function switchTab(tab, btn) {
+      ALL_TABS.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.style.display = t === tab ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    function activateTabById(tab) {
+      const btn = document.getElementById('btn-tab-' + tab);
+      switchTab(tab, btn);
+    }
+
+    let lastMaxUpdatedAt = '';
+
+    async function loadAllData(forceFull = false) {
+      document.getElementById('syncStatus').textContent = 'Yenileniyor...';
+      const isInitial = forceFull || rawRowsByAccountMap.size === 0 || !lastMaxUpdatedAt;
+      const selectCols = isInitial
+        ? '*'
+        : 'account_id,email,display_name,age,gender,city,height,weight,zodiac,tags,prompt_question,prompt_answer,is_verified,is_pro,has_completed_onboarding,profile_json,created_at,updated_at';
+
+      let query = sb
+        .from('profiles')
+        .select(selectCols)
+        .order('updated_at', { ascending: false })
+        .limit(1000);
+
+      if (!isInitial && lastMaxUpdatedAt) {
+        query = query.gt('updated_at', lastMaxUpdatedAt);
+      }
+
+      const { data: rows, error } = await query;
+
+      if (error) {
+        document.getElementById('syncStatus').textContent = 'Bağlantı hatası!';
+        return;
+      }
+
+      if (!isInitial && Array.isArray(rows) && rows.length === 0) {
+        document.getElementById('syncStatus').textContent =
+          'Canlı Bağlı • ' + new Date().toLocaleTimeString('tr-TR');
+        return;
+      }
+
+      const { data: repRows } = await sb
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      allReports = repRows || [];
+
+      const missingMediaAccounts = [];
+      if (Array.isArray(rows)) {
+        rows.forEach(r => {
+          if (r.updated_at && String(r.updated_at) > lastMaxUpdatedAt) {
+            lastMaxUpdatedAt = String(r.updated_at);
+          }
+          const k = String(r.account_id || '').toLowerCase();
+          if (!k) return;
+          const prev = rawRowsByAccountMap.get(k);
+          if (prev && !isInitial) {
+            const updatedChanged = Boolean(r.updated_at) && r.updated_at !== prev.updated_at;
+            rawRowsByAccountMap.set(k, {
+              ...prev,
+              ...r,
+              photos: Array.isArray(r.photos) ? r.photos : prev.photos,
+              voice_uri: 'voice_uri' in r ? r.voice_uri : prev.voice_uri,
+            });
+            if (updatedChanged && !('voice_uri' in r)) {
+              missingMediaAccounts.push(r.account_id);
+            }
+          } else {
+            rawRowsByAccountMap.set(k, r);
+            if (!isInitial && !Array.isArray(r.photos)) {
+              missingMediaAccounts.push(r.account_id);
+            }
+          }
+        });
+      }
+
+      if (missingMediaAccounts.length > 0) {
+        const { data: mediaRows } = await sb
+          .from('profiles')
+          .select('account_id,photos,voice_uri')
+          .in('account_id', missingMediaAccounts);
+        if (Array.isArray(mediaRows)) {
+          mediaRows.forEach(mr => {
+            const k = String(mr.account_id || '').toLowerCase();
+            const cur = rawRowsByAccountMap.get(k);
+            if (cur) {
+              rawRowsByAccountMap.set(k, {
+                ...cur,
+                photos: mr.photos || [],
+                voice_uri: mr.voice_uri || null,
+              });
+            }
+          });
+        }
+      }
+
+      const mergedRows = Array.from(rawRowsByAccountMap.values()).sort((a, b) =>
+        String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+      );
+
+      allProfiles = mergedRows.filter(r => !isHiddenTestAccount(r));
+      profileByKey = new Map();
+      incomingLikesMap = new Map();
+
+      allProfiles.forEach(r => {
+        const acc = String(r.account_id || '').toLowerCase();
+        const sh = shortIdOf(acc);
+        profileByKey.set(acc, r);
+        profileByKey.set(sh, r);
+      });
+
+      allProfiles.forEach(sender => {
+        const likes = sender.profile_json?._cloudState?.sentLikes || [];
+        if (Array.isArray(likes)) {
+          likes.forEach(targetRaw => {
+            const targetProf = resolveProfile(targetRaw);
+            const tShort = shortIdOf(targetProf.account_id || targetRaw);
+            if (!incomingLikesMap.has(tShort)) incomingLikesMap.set(tShort, []);
+            incomingLikesMap.get(tShort).push(sender);
+          });
+        }
+      });
+
+      buildUnifiedThreads();
+      buildSupportThreads();
+      updateKPIs();
+      renderSupportThreads();
+      renderRealUsers();
+      renderFakeUsers();
+      renderThreads();
+      renderLikes();
+      renderReports();
+
+      const nowStr = new Date().toLocaleTimeString('tr-TR');
+      document.getElementById('syncStatus').textContent = 'Canlı • Son güncelleme ' + nowStr;
+    }
+
+    function buildSupportThreads() {
+      const byAcc = new Map();
+
+      allProfiles.forEach(row => {
+        const cs = row.profile_json?._cloudState || {};
+        const msgs = Array.isArray(cs.supportMessages) ? [...cs.supportMessages] : [];
+        if (msgs.length > 0) {
+          byAcc.set(String(row.account_id || '').toLowerCase(), {
+            accountId: row.account_id,
+            row,
+            msgs,
+            deviceMeta: cs.deviceMeta || {},
+          });
+        }
+      });
+
+      // Also merge any backup support tickets from `reports` where reported_id === 'FROST_CANLI_DESTEK'
+      allReports.forEach(rep => {
+        if (rep.reported_id !== 'FROST_CANLI_DESTEK') return;
+        const repAcc = String(rep.reporter_id || 'misafir@frost.dating').toLowerCase();
+        const row = resolveProfile(repAcc);
+        if (!byAcc.has(repAcc)) {
+          byAcc.set(repAcc, {
+            accountId: row.account_id || repAcc,
+            row,
+            msgs: [],
+            deviceMeta: row.profile_json?._cloudState?.deviceMeta || {},
+          });
+        }
+        const entry = byAcc.get(repAcc);
+        // Extract clean text from "[Category] (Name • Cihaz: ... • ID: ...): Message"
+        const rawReason = String(rep.reason || '');
+        const colonIdx = rawReason.indexOf('): ');
+        const cleanMsgText = colonIdx !== -1 ? rawReason.slice(colonIdx + 3).trim() : rawReason;
+        const catMatch = rawReason.match(/^\[(.*?)\]/);
+        const category = catMatch ? catMatch[1] : 'Genel Destek';
+        const alreadyExists = entry.msgs.some(m =>
+          m.sender === 'user' && String(m.text || '').trim() === cleanMsgText
+        );
+        if (!alreadyExists && cleanMsgText) {
+          entry.msgs.push({
+            id: 'rep-' + rep.id,
+            sender: 'user',
+            category,
+            text: cleanMsgText,
+            createdAt: rep.created_at,
+          });
+        }
+      });
+
+      const list = [];
+      byAcc.forEach(entry => {
+        if (!entry.msgs.length) return;
+        const sortedMsgs = [...entry.msgs].sort(
+          (a, b) => parseTimestampMs(a.createdAt, a.id) - parseTimestampMs(b.createdAt, b.id)
+        );
+        const lastMsg = sortedMsgs[sortedMsgs.length - 1];
+        const lastMs = parseTimestampMs(lastMsg?.createdAt, lastMsg?.id, entry.row?.updated_at);
+        const waitingAdmin = lastMsg?.sender === 'user';
+        list.push({
+          accountId: entry.accountId,
+          row: entry.row,
+          msgs: sortedMsgs,
+          lastMsg,
+          lastMs,
+          waitingAdmin,
+          deviceMeta: entry.deviceMeta || {},
+        });
+      });
+
+      // Sort: Waiting for reply & newest timestamp on top!
+      supportThreads = list.sort((a, b) => {
+        if (a.waitingAdmin !== b.waitingAdmin) return a.waitingAdmin ? -1 : 1;
+        return b.lastMs - a.lastMs;
+      });
+    }
+
+    function buildUnifiedThreads() {
+      const pairMap = new Map();
+
+      allProfiles.forEach(owner => {
+        const ownerShort = shortIdOf(owner.account_id);
+        const chats = owner.profile_json?._cloudState?.chats || {};
+        Object.entries(chats).forEach(([partnerKey, thread]) => {
+          if (!thread || !Array.isArray(thread.msgs)) return;
+          const partnerRow = resolveProfile(partnerKey);
+          const partnerShort = shortIdOf(partnerRow.account_id || partnerKey);
+          const pairId = [ownerShort, partnerShort].sort().join('::');
+
+          let latestMs = 0;
+          thread.msgs.forEach(m => {
+            const ms = parseTimestampMs(m.createdAt, m.id, null);
+            if (ms > latestMs) latestMs = ms;
+          });
+          if (!latestMs) {
+            latestMs = Math.max(
+              Date.parse(owner.updated_at || '') || 0,
+              Date.parse(partnerRow.updated_at || '') || 0
+            );
+          }
+
+          const existing = pairMap.get(pairId);
+          if (
+            !existing ||
+            thread.msgs.length > existing.rawThread.msgs.length ||
+            (thread.msgs.length === existing.rawThread.msgs.length && latestMs > existing.latestMs)
+          ) {
+            pairMap.set(pairId, {
+              pairId,
+              ownerRow: owner,
+              partnerRow,
+              ownerShort,
+              partnerShort,
+              rawThread: thread,
+              latestMs,
+              involvesRealUser: isRealUser(owner) || isRealUser(partnerRow),
+            });
+          }
+        });
+      });
+
+      unifiedThreads = Array.from(pairMap.values()).sort((a, b) => b.latestMs - a.latestMs);
+    }
+
+    function updateKPIs() {
+      const realUsers = allProfiles.filter(isRealUser);
+      const fakeUsers = allProfiles.filter(isFakeAccount);
+      const fakeWomen = fakeUsers.filter(r => r.gender === 'Kadın').length;
+      const fakeMen = fakeUsers.filter(r => r.gender === 'Erkek').length;
+      const proCount = realUsers.filter(r => r.is_pro).length;
+
+      let likeEdges = 0;
+      allProfiles.forEach(r => {
+        const s = r.profile_json?._cloudState?.sentLikes;
+        if (Array.isArray(s)) likeEdges += s.length;
+      });
+
+      let totalMsgs = 0;
+      unifiedThreads.forEach(t => { totalMsgs += (t.rawThread.msgs || []).length; });
+
+      const waitingTickets = supportThreads.filter(t => t.waitingAdmin).length;
+
+      document.getElementById('kpiSupportTickets').textContent = supportThreads.length;
+      document.getElementById('kpiSupportSub').textContent = waitingTickets > 0
+        ? `🔴 ${waitingTickets} talep yanıt bekliyor!`
+        : 'Tüm talepler yanıtlandı';
+
+      document.getElementById('kpiRealUsers').textContent = realUsers.length;
+      document.getElementById('kpiRealSub').textContent = `${proCount} FROST+ / VIP üye`;
+
+      document.getElementById('kpiFakeUsers').textContent = fakeUsers.length;
+      document.getElementById('kpiFakeSplit').textContent = `${fakeWomen} Kadın • ${fakeMen} Erkek`;
+
+      document.getElementById('kpiTotalChats').textContent = unifiedThreads.length;
+      document.getElementById('kpiTotalMsgs').textContent = `${totalMsgs} toplam mesaj`;
+
+      document.getElementById('kpiTotalLikes').textContent = likeEdges;
+      document.getElementById('kpiProSub').textContent = `Şikayet kaydı: ${allReports.length}`;
+
+      // Tab badges
+      const cntSup = document.getElementById('cntSupport');
+      cntSup.textContent = waitingTickets > 0 ? `${waitingTickets} YENİ` : supportThreads.length;
+      if (waitingTickets > 0) cntSup.classList.add('tab-alert');
+      else cntSup.classList.remove('tab-alert');
+
+      document.getElementById('cntReal').textContent = realUsers.length;
+      document.getElementById('cntFake').textContent = fakeUsers.length;
+      document.getElementById('cntChats').textContent = unifiedThreads.length;
+      document.getElementById('cntLikes').textContent = likeEdges;
+      document.getElementById('cntReports').textContent = allReports.length;
+    }
+
+    // ========================================================================
+    // 1. RENDER LIVE SUPPORT / TICKETS
+    // ========================================================================
+    function renderSupportThreads() {
+      document.getElementById('supportCountBadge').textContent = `${supportThreads.length} Konuşma`;
+      const container = document.getElementById('supportThreadsList');
+      if (!supportThreads.length) {
+        container.innerHTML = `<div style="padding: 22px; color: var(--ink2); font-size: 13px; line-height: 1.5;">Henüz destek talebi gönderilmedi. Kullanıcılar Ayarlar → Canlı Destek ekranından yazdığında anında burada görünür.</div>`;
+        return;
+      }
+
+      container.innerHTML = supportThreads.map(item => {
+        const u = item.row;
+        const active = item.accountId === selectedSupportAccountId;
+        const devId = item.lastMsg?.deviceId || item.deviceMeta?.deviceId || '-';
+        return `
+          <div class="thread-item ${active ? 'active' : ''}" onclick="selectSupportThread('${esc(item.accountId)}')">
+            <img class="avatar-sm" src="${cleanPhoto((u.photos || [])[0])}" />
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <strong style="font-size: 13.5px;">${esc(u.display_name || u.account_id)}</strong>
+                ${item.waitingAdmin
+                  ? '<span class="badge badge-urgent">YANIT BEKLİYOR</span>'
+                  : '<span class="badge badge-real">YANITLANDI</span>'}
+              </div>
+              <div style="font-size: 11px; color: var(--cold); margin-top: 2px;">${esc(item.lastMsg?.category || 'Destek')} • ID: ${esc(devId)}</div>
+              <div style="font-size: 12px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                ${esc(item.lastMsg?.text || '')}
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 11px; color: var(--ink2);">
+              ${formatDateTime(item.lastMs)}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (selectedSupportAccountId) {
+        const stillExists = supportThreads.some(x => x.accountId === selectedSupportAccountId);
+        if (stillExists) selectSupportThread(selectedSupportAccountId, true);
+      }
+    }
+
+    function selectSupportThread(accountId, skipReRenderList) {
+      selectedSupportAccountId = accountId;
+      if (!skipReRenderList) renderSupportThreads();
+
+      const item = supportThreads.find(x => x.accountId === accountId);
+      if (!item) return;
+
+      const u = item.row;
+      const devInfo = item.lastMsg?.deviceInfo || item.deviceMeta?.deviceSummary || 'Bilinmiyor';
+      const devId = item.lastMsg?.deviceId || item.deviceMeta?.deviceId || 'Bilinmiyor';
+
+      document.getElementById('activeSupportHeader').innerHTML = `
+        <div>
+          <strong style="font-size: 15px;">${esc(u.display_name || 'Üye')}, ${esc(u.age || '-')}</strong>
+          <span style="color: var(--ink2); font-size: 12px; margin-left: 6px;">(${esc(u.account_id)})</span>
+          <div style="font-size: 12px; color: var(--cold); margin-top: 3px;">
+            📱 Cihaz: <b>${esc(devInfo)}</b> • 🔑 Cihaz ID: <b>${esc(devId)}</b> • ${u.is_pro ? '⭐ FROST+ / VIP' : 'Standart Üye'}
+          </div>
+        </div>
+        <button class="btn" onclick="openUserInspector('${esc(u.account_id)}')">🔍 Kullanıcı Geçmişini Aç</button>
+      `;
+
+      const area = document.getElementById('supportMessagesArea');
+      area.innerHTML = item.msgs.map(m => {
+        const isUser = m.sender === 'user';
+        const ts = formatDateTime(parseTimestampMs(m.createdAt, m.id));
+        return `
+          <div class="msg-bubble ${isUser ? 'msg-a' : 'msg-admin'}">
+            <div class="msg-sender">
+              <span>${isUser ? `👤 ${esc(u.display_name || 'Kullanıcı')} • [${esc(m.category || 'Genel')}]` : '🎧 FROST Destek Ekibi (Sen)'}</span>
+            </div>
+            <div>${esc(m.text)}</div>
+            <div class="msg-time">${ts} ${m.deviceId ? '• ' + esc(m.deviceId) : ''}</div>
+          </div>
+        `;
+      }).join('');
+      area.scrollTop = area.scrollHeight;
+
+      const replyBar = document.getElementById('supportReplyBar');
+      replyBar.style.display = 'flex';
+
+      const mailBtn = document.getElementById('supportMailtoBtn');
+      const targetEmail = u.email || (String(u.account_id).includes('@') ? u.account_id : '');
+      if (targetEmail && !targetEmail.endsWith('@frost.app')) {
+        mailBtn.style.display = 'inline-flex';
+        mailBtn.href = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent('FROST Destek Yanıtınız')}&body=${encodeURIComponent(`Merhaba ${u.display_name || ''},\n\nFROST destek talebiniz incelendi:\n\n`)}`;
+      } else {
+        mailBtn.style.display = 'none';
+      }
+    }
+
+    async function sendAdminSupportReply() {
+      if (!selectedSupportAccountId) return;
+      const inp = document.getElementById('supportReplyInput');
+      const text = inp.value.trim();
+      if (!text) return;
+
+      const row = profileByKey.get(selectedSupportAccountId.toLowerCase());
+      if (!row) return;
+
+      const pj = row.profile_json || {};
+      const cs = pj._cloudState || {};
+      const prevMsgs = Array.isArray(cs.supportMessages) ? cs.supportMessages : [];
+      const nextMsgs = [
+        ...prevMsgs,
+        {
+          id: 'sup-adm-' + Date.now(),
+          sender: 'admin',
+          category: 'Destek Yanıtı',
+          text,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
+      await sb.from('profiles').update({
+        profile_json: {
+          ...pj,
+          _cloudState: {
+            ...cs,
+            supportMessages: nextMsgs,
+          },
+        },
+        updated_at: new Date().toISOString(),
+      }).eq('account_id', row.account_id);
+
+      inp.value = '';
+      showToast('Yanıt gönderildi! Kullanıcının uygulamasına bildirim olarak düşecek.');
+      await loadAllData();
+    }
+
+    // ========================================================================
+    // 2. RENDER USER CARD HELPER (USED BY BOTH REAL & FAKE TABS)
+    // ========================================================================
+    function buildUserCardHtml(r, isFakeTab) {
+      const cs = r.profile_json?._cloudState || {};
+      const devMeta = cs.deviceMeta || {};
+      const flakes = typeof cs.flakesRemaining === 'number' ? cs.flakesRemaining : 15;
+      const likesSent = Array.isArray(cs.sentLikes) ? cs.sentLikes.length : 0;
+      const sh = shortIdOf(r.account_id);
+      const likesReceived = (incomingLikesMap.get(sh) || []).length;
+      const passedCnt = Array.isArray(cs.passedIds) ? cs.passedIds.length : 0;
+      const supportCnt = Array.isArray(cs.supportMessages) ? cs.supportMessages.length : 0;
+
+      // Count active chats involving this user across unifiedThreads
+      const activeChatCnt = unifiedThreads.filter(
+        t => t.ownerShort === sh || t.partnerShort === sh
+      ).length;
+
+      const hero = cleanPhoto((r.photos || [])[0]);
+      const rawVoice = String(r.voice_uri || (r.profile_json && r.profile_json.voiceUri) || '').trim();
+      const isLocalDeviceVoice = rawVoice.startsWith('file://');
+      const isPlayableVoice = Boolean(
+        rawVoice &&
+        !rawVoice.startsWith('https://frost.app/voices/') &&
+        !isLocalDeviceVoice
+      );
+      const hasAnyVoice = isPlayableVoice || isLocalDeviceVoice;
+      const lastUpd = formatDateTime(devMeta.lastActiveAt || r.updated_at || r.created_at);
+      const createdStr = formatDateTime(r.created_at);
+
+      return `
+        <div class="user-card">
+          <div class="user-top">
+            <img class="avatar-lg" src="${hero}" onerror="this.style.opacity=0.2" />
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <strong style="font-size: 15.5px;">${esc(r.display_name || 'İsimsiz')}, ${esc(r.age || '-')}</strong>
+                <span class="badge ${isFakeTab ? 'badge-fake' : 'badge-real'}">${isFakeTab ? '🤖 FAKE / SİSTEM' : '👤 GERÇEK ÜYE'}</span>
+                ${r.is_pro ? '<span class="badge badge-pro">FROST+ / VIP</span>' : ''}
+                ${supportCnt > 0 ? `<span class="badge badge-urgent">🎧 ${supportCnt} Ticket</span>` : ''}
+              </div>
+              <div style="font-size: 12px; color: var(--ink2); margin-top: 3px; word-break: break-all;">${esc(r.account_id)}</div>
+              <div style="font-size: 12px; color: var(--cold); margin-top: 2px;">
+                ${esc(r.gender || '-')} • ${esc(r.city || 'İstanbul')} • ${(r.photos || []).length} Fotoğraf
+              </div>
+              <div style="font-size: 11px; color: var(--ink2); margin-top: 3px;">
+                🕒 Son İşlem: <b>${lastUpd}</b> ${!isFakeTab ? `• Kayıt: ${createdStr}` : ''}
+                ${devMeta.deviceId ? `<br/>📱 <b>${esc(devMeta.deviceSummary || '')}</b> • ID: <code style="color:var(--cold)">${esc(devMeta.deviceId)}</code>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div class="meta-pills">
+            ${!isFakeTab ? `<span class="meta-pill">❄ Hak: <b>${r.is_pro ? '∞' : flakes}</b></span>` : ''}
+            <span class="meta-pill">📤 Attığı Like: <b>${likesSent}</b></span>
+            <span class="meta-pill">📥 Aldığı Like: <b>${likesReceived}</b></span>
+            ${!isFakeTab ? `<span class="meta-pill">✕ Geçtiği: <b>${passedCnt}</b></span>` : ''}
+            <span class="meta-pill">💬 DM Odası: <b>${activeChatCnt}</b></span>
+            <span class="meta-pill">🎤 Ses: <b>${isPlayableVoice ? 'Hazır (Dinlenebilir)' : isLocalDeviceVoice ? 'Cihaz İçi (Eski)' : 'Yok'}</b></span>
+          </div>
+
+          ${isPlayableVoice ? `<audio controls preload="metadata" style="width: 100%; height: 34px;" src="${rawVoice}"></audio>` : ''}
+          ${isLocalDeviceVoice ? `<div style="font-size: 11.5px; color: var(--amber); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.28); padding: 6px 10px; border-radius: 9px;">🎤 <b>Eski Cihaz İçi Kayıt:</b> Telefonda <code>file://</code> olarak kayıtlı. Kullanıcı uygulamayı açtığında otomatik buluta senkronize olur veya <b>"🎤 Ses Yükle"</b> ile ses atayabilirsin.</div>` : ''}
+
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
+            <button class="btn btn-primary" onclick="openUserInspector('${esc(r.account_id)}')">🔍 Tüm Hareketleri & DM</button>
+            ${!isFakeTab ? `<button class="btn" onclick="giveFlakes('${esc(r.account_id)}', 15)">+15 Hak</button>` : ''}
+            ${!isFakeTab ? `<button class="btn" onclick="togglePro('${esc(r.account_id)}', ${!r.is_pro})">${r.is_pro ? 'VIP Kapat' : 'VIP Yap'}</button>` : ''}
+            <button class="btn" onclick="uploadVoiceFor('${esc(r.account_id)}')">🎤 Ses Yükle</button>
+            ${hasAnyVoice ? `<button class="btn" onclick="clearVoiceFor('${esc(r.account_id)}')">Sesi Kaldır</button>` : ''}
+            ${!isFakeTab ? `<button class="btn" onclick="resetSwipes('${esc(r.account_id)}')">Geçmeleri Sıfırla</button>` : ''}
+            <button class="btn btn-danger" onclick="deleteUser('${esc(r.account_id)}')">Sil</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRealUsers() {
+      const q = document.getElementById('realUserSearch').value.trim().toLowerCase();
+      const sortBy = document.getElementById('realUserSort').value;
+      const genF = document.getElementById('realUserGender').value;
+
+      let list = allProfiles.filter(r => {
+        if (!isRealUser(r)) return false;
+        if (genF !== 'all' && r.gender !== genF) return false;
+        if (q) {
+          const devId = r.profile_json?._cloudState?.deviceMeta?.deviceId || '';
+          const hay = `${r.display_name || ''} ${r.account_id || ''} ${r.email || ''} ${r.city || ''} ${devId}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        const csA = a.profile_json?._cloudState || {};
+        const csB = b.profile_json?._cloudState || {};
+        if (sortBy === 'newest_created') {
+          return (Date.parse(b.created_at || '') || 0) - (Date.parse(a.created_at || '') || 0);
+        }
+        if (sortBy === 'most_chats') {
+          const shA = shortIdOf(a.account_id), shB = shortIdOf(b.account_id);
+          const cA = unifiedThreads.filter(t => t.ownerShort === shA || t.partnerShort === shA).length;
+          const cB = unifiedThreads.filter(t => t.ownerShort === shB || t.partnerShort === shB).length;
+          return cB - cA;
+        }
+        if (sortBy === 'most_likes') {
+          return (csB.sentLikes?.length || 0) - (csA.sentLikes?.length || 0);
+        }
+        if (sortBy === 'name_az') {
+          return String(a.display_name || '').localeCompare(String(b.display_name || ''), 'tr');
+        }
+        // default: recent_active
+        const tA = Date.parse(csA.deviceMeta?.lastActiveAt || a.updated_at || a.created_at || '') || 0;
+        const tB = Date.parse(csB.deviceMeta?.lastActiveAt || b.updated_at || b.created_at || '') || 0;
+        return tB - tA;
+      });
+
+      const grid = document.getElementById('realUsersGrid');
+      grid.innerHTML = list.length
+        ? list.map(r => buildUserCardHtml(r, false)).join('')
+        : `<div style="color: var(--ink2); padding: 24px;">Filtreye uygun gerçek kullanıcı bulunamadı.</div>`;
+    }
+
+    function renderFakeUsers() {
+      const q = document.getElementById('fakeUserSearch').value.trim().toLowerCase();
+      const genF = document.getElementById('fakeUserGender').value;
+      const sortBy = document.getElementById('fakeUserSort').value;
+
+      let list = allProfiles.filter(r => {
+        if (!isFakeAccount(r)) return false;
+        if (genF !== 'all' && r.gender !== genF) return false;
+        if (q) {
+          const hay = `${r.display_name || ''} ${r.account_id || ''} ${r.city || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        if (sortBy === 'most_interacted') {
+          const shA = shortIdOf(a.account_id), shB = shortIdOf(b.account_id);
+          const scoreA = (incomingLikesMap.get(shA)?.length || 0) * 2 + unifiedThreads.filter(t => t.ownerShort === shA || t.partnerShort === shA).length * 5;
+          const scoreB = (incomingLikesMap.get(shB)?.length || 0) * 2 + unifiedThreads.filter(t => t.ownerShort === shB || t.partnerShort === shB).length * 5;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+        }
+        if (sortBy === 'name_az') {
+          return String(a.display_name || '').localeCompare(String(b.display_name || ''), 'tr');
+        }
+        return (Date.parse(b.updated_at || b.created_at || '') || 0) - (Date.parse(a.updated_at || a.created_at || '') || 0);
+      });
+
+      const grid = document.getElementById('fakeUsersGrid');
+      grid.innerHTML = list.length
+        ? list.map(r => buildUserCardHtml(r, true)).join('')
+        : `<div style="color: var(--ink2); padding: 24px;">Filtreye uygun fake (@frost.app) hesap bulunamadı.</div>`;
+    }
+
+    // ========================================================================
+    // 3. RENDER CHATS (CHRONOLOGICAL BY LAST MESSAGE!)
+    // ========================================================================
+    function getFilteredSortedThreads() {
+      const q = (document.getElementById('chatSearchInput')?.value || '').trim().toLowerCase();
+      const sortMode = document.getElementById('chatSortSelect')?.value || 'latest_msg';
+      const scope = document.getElementById('chatScopeSelect')?.value || 'all';
+
+      let arr = unifiedThreads.filter(item => {
+        if (scope === 'real_only' && !item.involvesRealUser) return false;
+        if (q) {
+          const msgText = (item.rawThread.msgs || []).map(m => m.text || '').join(' ');
+          const hay = `${item.ownerRow.display_name || ''} ${item.ownerRow.account_id || ''} ${item.partnerRow.display_name || ''} ${item.partnerRow.account_id || ''} ${msgText}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      arr.sort((a, b) => {
+        if (sortMode === 'most_msgs') {
+          return (b.rawThread.msgs?.length || 0) - (a.rawThread.msgs?.length || 0);
+        }
+        if (sortMode === 'melted_first') {
+          const mA = a.rawThread.melted ? 1 : 0;
+          const mB = b.rawThread.melted ? 1 : 0;
+          if (mB !== mA) return mB - mA;
+          return (b.rawThread.temp ?? -20) - (a.rawThread.temp ?? -20);
+        }
+        return b.latestMs - a.latestMs;
+      });
+
+      return arr;
+    }
+
+    function renderThreads() {
+      const list = getFilteredSortedThreads();
+      document.getElementById('threadCountBadge').textContent = `${list.length} Oda`;
+      const container = document.getElementById('threadsList');
+
+      if (!list.length) {
+        container.innerHTML = `<div style="padding: 20px; color: var(--ink2); font-size: 13px;">Bu filtrede aktif mesajlaşma bulunamadı.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(item => {
+        const a = item.ownerRow;
+        const b = item.partnerRow;
+        const t = item.rawThread;
+        const lastMsg = (t.msgs || [])[t.msgs.length - 1];
+        const active = item.pairId === selectedThreadPairId;
+        return `
+          <div class="thread-item ${active ? 'active' : ''}" onclick="selectThreadByPair('${esc(item.pairId)}')">
+            <div class="avatar-pair">
+              <img class="avatar-sm" src="${cleanPhoto((a.photos||[])[0])}" />
+              <img class="avatar-sm" src="${cleanPhoto((b.photos||[])[0])}" />
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 800; font-size: 13.5px;">
+                ${esc(a.display_name || item.ownerShort)} ↔ ${esc(b.display_name || item.partnerShort)}
+              </div>
+              <div style="font-size: 11px; color: var(--cold); margin-top: 2px;">
+                🕒 ${formatDateTime(item.latestMs)}
+              </div>
+              <div style="font-size: 12px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                ${esc(lastMsg ? lastMsg.text : 'Mesaj yok')}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span class="badge ${t.melted ? 'badge-real' : 'badge-seed'}">${t.melted ? '0° Açık' : (t.temp ?? -14) + '°'}</span>
+              <div style="font-size: 11px; color: var(--ink2); margin-top: 4px;">${(t.msgs || []).length} msj</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (selectedThreadPairId) {
+        const found = unifiedThreads.find(x => x.pairId === selectedThreadPairId);
+        if (found) selectThreadByPair(selectedThreadPairId, true);
+      }
+    }
+
+    function selectThreadByPair(pairId, skipReRenderList) {
+      selectedThreadPairId = pairId;
+      if (!skipReRenderList) renderThreads();
+
+      const item = unifiedThreads.find(x => x.pairId === pairId);
+      if (!item) return;
+
+      const aName = item.ownerRow.display_name || item.ownerShort;
+      const bName = item.partnerRow.display_name || item.partnerShort;
+      const t = item.rawThread;
+
+      document.getElementById('activeChatHeader').innerHTML = `
+        <div>
+          <strong>${esc(aName)}</strong> <span style="color:var(--ink2); font-size:12px;">(${esc(item.ownerRow.account_id)})</span>
+          ↔
+          <strong>${esc(bName)}</strong> <span style="color:var(--ink2); font-size:12px;">(${esc(item.partnerRow.account_id)})</span>
+          <div style="font-size: 11.5px; color: var(--cold); margin-top: 2px;">Son mesaj zamanı: ${formatDateTime(item.latestMs)}</div>
+        </div>
+        <span class="badge ${t.melted ? 'badge-real' : 'badge-seed'}">${t.melted ? '0° Buz Çözüldü' : 'Sıcaklık: ' + (t.temp ?? -14) + '°'}</span>
+      `;
+
+      const area = document.getElementById('messagesArea');
+      area.innerHTML = (t.msgs || []).map(m => {
+        const msgMs = parseTimestampMs(m.createdAt, m.id, null);
+        const timeTxt = msgMs ? formatDateTime(msgMs) : '';
+        if (m.sender === 'sys') {
+          return `<div class="msg-sys">❄ ${esc(m.text)} ${timeTxt ? `<span style="opacity:0.65; font-weight:500;">(${timeTxt})</span>` : ''}</div>`;
+        }
+        const isMe = m.sender === 'me';
+        const senderLabel = isMe ? aName : bName;
+        return `
+          <div class="msg-bubble ${isMe ? 'msg-a' : 'msg-b'}">
+            <div class="msg-sender"><span>${esc(senderLabel)}</span></div>
+            <div>${esc(m.text)}</div>
+            ${timeTxt ? `<div class="msg-time">${timeTxt}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+      area.scrollTop = area.scrollHeight;
+
+      const replyBar = document.getElementById('adminReplyBar');
+      replyBar.style.display = 'flex';
+      const sel = document.getElementById('replySenderSelect');
+      sel.innerHTML = `
+        <option value="partner">${esc(bName)} ağzından → ${esc(aName)}'e yaz</option>
+        <option value="owner">${esc(aName)} ağzından → ${esc(bName)}'e yaz</option>
+      `;
+    }
+
+    async function sendAdminChatReply() {
+      const item = unifiedThreads.find(x => x.pairId === selectedThreadPairId);
+      const text = document.getElementById('replyMessageInput').value.trim();
+      if (!item || !text) return;
+
+      const nowIso = new Date().toISOString();
+      const mode = document.getElementById('replySenderSelect').value;
+      const senderRow = mode === 'partner' ? item.partnerRow : item.ownerRow;
+      const recipientRow = mode === 'partner' ? item.ownerRow : item.partnerRow;
+      const senderShort = shortIdOf(senderRow.account_id);
+      const recipientShort = shortIdOf(recipientRow.account_id);
+
+      const recJson = recipientRow.profile_json || {};
+      const recCs = recJson._cloudState || {};
+      const recChats = { ...(recCs.chats || {}) };
+      const existingRecThread = recChats[senderShort] || {
+        profileId: senderShort,
+        temp: -12,
+        melted: false,
+        msgs: [],
+      };
+      const nextTemp = existingRecThread.melted ? 0 : Math.min(0, (existingRecThread.temp ?? -12) + 2);
+      recChats[senderShort] = {
+        ...existingRecThread,
+        temp: nextTemp,
+        awaitingFirstReply: false,
+        unreadCount: (existingRecThread.unreadCount || 0) + 1,
+        msgs: [
+          ...(existingRecThread.msgs || []),
+          { id: 'adm-' + Date.now(), sender: 'them', text, createdAt: nowIso },
+        ],
+      };
+
+      await sb.from('profiles').update({
+        profile_json: { ...recJson, _cloudState: { ...recCs, chats: recChats } },
+        updated_at: nowIso,
+      }).eq('account_id', recipientRow.account_id);
+
+      if (senderRow.id) {
+        const sJson = senderRow.profile_json || {};
+        const sCs = sJson._cloudState || {};
+        const sChats = { ...(sCs.chats || {}) };
+        const exS = sChats[recipientShort] || { profileId: recipientShort, temp: nextTemp, melted: false, msgs: [] };
+        sChats[recipientShort] = {
+          ...exS,
+          temp: nextTemp,
+          awaitingFirstReply: false,
+          msgs: [
+            ...(exS.msgs || []),
+            { id: 'adm-me-' + Date.now(), sender: 'me', text, createdAt: nowIso },
+          ],
+        };
+        await sb.from('profiles').update({
+          profile_json: { ...sJson, _cloudState: { ...sCs, chats: sChats } },
+          updated_at: nowIso,
+        }).eq('account_id', senderRow.account_id);
+      }
+
+      document.getElementById('replyMessageInput').value = '';
+      showToast('Mesaj canlı olarak iletildi!');
+      await loadAllData();
+    }
+
+    // ========================================================================
+    // 4. RENDER LIKES & PASSES (CHRONOLOGICAL + USER FILTER)
+    // ========================================================================
+    function renderLikes() {
+      const mode = document.getElementById('likeActionFilter').value;
+      const realOnly = document.getElementById('likeRealFilter').value === 'real';
+      const q = document.getElementById('likeUserSearch').value.trim().toLowerCase();
+
+      const items = [];
+      allProfiles.forEach(sender => {
+        if (realOnly && !isRealUser(sender)) return;
+        const cs = sender.profile_json?._cloudState || {};
+        const arr = mode === 'likes' ? (cs.sentLikes || []) : (cs.passedIds || []);
+        const senderMs = Date.parse(cs.deviceMeta?.lastActiveAt || sender.updated_at || sender.created_at || '') || 0;
+
+        arr.forEach((targetKey, orderIdx) => {
+          const target = resolveProfile(targetKey);
+          if (q) {
+            const hay = `${sender.display_name || ''} ${sender.account_id || ''} ${target.display_name || ''} ${target.account_id || targetKey}`.toLowerCase();
+            if (!hay.includes(q)) return;
+          }
+          const targetLikes = target.profile_json?._cloudState?.sentLikes || [];
+          const senderShort = shortIdOf(sender.account_id);
+          const isMutual = mode === 'likes' && targetLikes.map(x => String(x).toLowerCase()).includes(senderShort);
+          items.push({
+            sender,
+            target,
+            targetKey,
+            isMutual,
+            sortMs: senderMs + orderIdx, // later items in array were swiped more recently
+            displayMs: senderMs,
+          });
+        });
+      });
+
+      items.sort((a, b) => b.sortMs - a.sortMs);
+      document.getElementById('likesShownBadge').textContent = `${items.length} Kayıt`;
+
+      const html = items.map(it => `
+        <tr>
+          <td style="color: var(--ink2); font-size: 12px; white-space: nowrap;">${formatDateTime(it.displayMs)}</td>
+          <td>
+            <strong style="cursor:pointer; color:var(--cold);" onclick="openUserInspector('${esc(it.sender.account_id)}')">${esc(it.sender.display_name || it.sender.account_id)}</strong>
+            <span class="badge ${isRealUser(it.sender) ? 'badge-real' : 'badge-fake'}" style="margin-left:5px;">${isRealUser(it.sender) ? 'Gerçek' : 'Fake'}</span>
+            <div style="font-size:11.5px; color:var(--ink2)">${esc(it.sender.account_id)}</div>
+          </td>
+          <td><span class="like-arrow">${mode === 'likes' ? '❄ Kar Tanesi ➔' : '✕ Geçti ➔'}</span></td>
+          <td>
+            <strong style="cursor:pointer;" onclick="openUserInspector('${esc(it.target.account_id || it.targetKey)}')">${esc(it.target.display_name || it.targetKey)}</strong>
+            <div style="font-size:11.5px; color:var(--ink2)">${esc(it.target.account_id || it.targetKey)}</div>
+          </td>
+          <td>
+            ${mode === 'likes'
+              ? (it.isMutual
+                  ? '<span class="badge badge-real">KARŞILIKLI EŞLEŞME</span>'
+                  : '<span class="badge badge-seed">Yanıt Bekliyor</span>')
+              : '<span class="badge" style="color:var(--ink2)">Pas Geçildi</span>'}
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('likesTableBody').innerHTML =
+        html || `<tr><td colspan="5" style="color:var(--ink2); text-align:center; padding:24px;">Filtreye uygun beğeni / kaydırma kaydı yok.</td></tr>`;
+    }
+
+    // ========================================================================
+    // 5. RENDER REPORTS & BLOCKS
+    // ========================================================================
+    function renderReports() {
+      const html = [];
+      allReports.forEach(rep => {
+        const isSupport = rep.reported_id === 'FROST_CANLI_DESTEK';
+        html.push(`
+          <tr>
+            <td style="white-space:nowrap; color:var(--ink2);">${rep.created_at ? formatDateTime(rep.created_at) : '-'}</td>
+            <td><span class="badge ${isSupport ? 'badge-seed' : 'badge-urgent'}">${isSupport ? 'DESTEK KAYDI' : 'ŞİKAYET'}</span></td>
+            <td>${esc(rep.reporter_id || '-')}</td>
+            <td>${esc(rep.reported_id || '-')}</td>
+            <td><b>${esc(rep.reason || '-')}</b> ${rep.details ? '— ' + esc(rep.details) : ''}</td>
+          </tr>
+        `);
+      });
+
+      allProfiles.forEach(u => {
+        const blocks = u.profile_json?._cloudState?.blockedIds || [];
+        blocks.forEach(bId => {
+          html.push(`
+            <tr>
+              <td style="color:var(--ink2);">${formatDateTime(u.updated_at)}</td>
+              <td><span class="badge badge-pro">ENGELLEME</span></td>
+              <td>${esc(u.display_name)} (${esc(u.account_id)})</td>
+              <td>${esc(bId)}</td>
+              <td>Kullanıcı tarafından engellendi</td>
+            </tr>
+          `);
+        });
+      });
+
+      document.getElementById('reportsTableBody').innerHTML =
+        html.join('') || `<tr><td colspan="5" style="color:var(--ink2); text-align:center; padding:24px;">Şikayet veya engelleme kaydı yok.</td></tr>`;
+    }
+
+    // ========================================================================
+    // 6. FULL USER ACTIVITY INSPECTOR MODAL
+    // ========================================================================
+    function openUserInspector(accIdOrShort) {
+      const u = resolveProfile(accIdOrShort);
+      if (!u || !u.account_id) return;
+
+      const sh = shortIdOf(u.account_id);
+      const cs = u.profile_json?._cloudState || {};
+      const devMeta = cs.deviceMeta || {};
+      const sentLikes = Array.isArray(cs.sentLikes) ? cs.sentLikes : [];
+      const receivedFrom = incomingLikesMap.get(sh) || [];
+      const userChats = unifiedThreads.filter(t => t.ownerShort === sh || t.partnerShort === sh);
+      const photos = Array.isArray(u.photos) ? u.photos : [];
+      const rawVoice = String(u.voice_uri || (u.profile_json && u.profile_json.voiceUri) || '').trim();
+      const isLocalVoice = rawVoice.startsWith('file://');
+      const isPlayableVoice = Boolean(rawVoice && !rawVoice.startsWith('https://frost.app/voices/') && !isLocalVoice);
+
+      document.getElementById('inspectorTitle').textContent =
+        `${u.display_name || u.account_id} (${u.account_id}) — Tüm Hareket Özeti`;
+
+      document.getElementById('inspectorBody').innerHTML = `
+        <div style="display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; background:var(--bg); padding:14px; border-radius:16px; border:1px solid var(--border);">
+          <div>
+            <div style="font-size:17px; font-weight:900;">${esc(u.display_name || '-')}, ${esc(u.age || '-')} (${esc(u.gender || '-')})</div>
+            <div style="font-size:12.5px; color:var(--cold); margin-top:3px;">Hesap: ${esc(u.account_id)} • Şehir: ${esc(u.city || '-')}</div>
+            <div style="font-size:12px; color:var(--ink2); margin-top:4px;">
+              Cihaz: <b>${esc(devMeta.deviceSummary || '-')}</b> • Cihaz ID: <code style="color:var(--cold)">${esc(devMeta.deviceId || '-')}</code>
+            </div>
+            <div style="font-size:12px; color:var(--ink2); margin-top:2px;">
+              Kayıt: ${formatDateTime(u.created_at)} • Son İşlem: ${formatDateTime(devMeta.lastActiveAt || u.updated_at)}
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:12px;">
+          <div style="font-size:12px; font-weight:800; color:var(--ink2); margin-bottom:8px;">🎤 PROFİL SES KAYDI</div>
+          ${isPlayableVoice
+            ? `<audio controls preload="metadata" style="width:100%; height:36px;" src="${rawVoice}"></audio>`
+            : isLocalVoice
+            ? `<div style="font-size:12px; color:var(--amber);">Kullanıcının ses kaydı eski sürümde cihaz içi (<code>file://</code>) olarak kaydedilmiş. Kullanıcı uygulamaya girdiğinde otomatik buluta yüklenir.</div>`
+            : `<div style="font-size:12.5px; color:var(--ink2);">Bu hesapta henüz ses kaydı bulunmuyor. Kart üzerindeki <b>"🎤 Ses Yükle"</b> butonuyla ses ekleyebilirsin.</div>`
+          }
+        </div>
+
+        ${photos.length ? `
+          <div>
+            <div style="font-size:12px; font-weight:800; color:var(--ink2); margin-bottom:8px;">YÜKLÜ FOTOĞRAFLAR (${photos.length})</div>
+            <div class="photo-strip">
+              ${photos.map(p => `<img src="${cleanPhoto(p)}" />`).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <div>
+          <div style="font-size:12px; font-weight:800; color:var(--ink2); margin-bottom:8px;">💬 KONUŞTUĞU KİŞİLER / DM ODALARI (${userChats.length})</div>
+          ${userChats.length ? userChats.map(t => {
+            const other = t.ownerShort === sh ? t.partnerRow : t.ownerRow;
+            const last = (t.rawThread.msgs || [])[t.rawThread.msgs.length - 1];
+            return `
+              <div style="padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div>
+                  <strong>${esc(other.display_name || other.account_id)}</strong> <span style="font-size:11.5px; color:var(--ink2);">(${esc(other.account_id)})</span>
+                  <div style="font-size:12px; color:var(--ink2); margin-top:2px;">Son mesaj: "${esc(last?.text || '-')}" • ${formatDateTime(t.latestMs)}</div>
+                </div>
+                <button class="btn btn-primary" onclick="closeInspector(); activateTabById('chats'); selectThreadByPair('${esc(t.pairId)}');">Sohbeti Aç →</button>
+              </div>
+            `;
+          }).join('') : `<div style="color:var(--ink2); font-size:13px;">Henüz DM konuşması yok.</div>`}
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:12px;">
+            <div style="font-size:12px; font-weight:800; color:var(--cold); margin-bottom:6px;">📤 ATTIĞI LIKE'LAR (${sentLikes.length})</div>
+            <div style="font-size:12.5px; color:var(--ink); line-height:1.6;">
+              ${sentLikes.length ? sentLikes.map(k => {
+                const tp = resolveProfile(k);
+                return `• ${esc(tp.display_name || k)} <span style="color:var(--ink2)">(${esc(tp.account_id || k)})</span>`;
+              }).join('<br/>') : '<span style="color:var(--ink2)">Yok</span>'}
+            </div>
+          </div>
+
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:12px;">
+            <div style="font-size:12px; font-weight:800; color:var(--green); margin-bottom:6px;">📥 ALDIĞI LIKE'LAR (${receivedFrom.length})</div>
+            <div style="font-size:12.5px; color:var(--ink); line-height:1.6;">
+              ${receivedFrom.length ? receivedFrom.map(sr => `• ${esc(sr.display_name || sr.account_id)} <span style="color:var(--ink2)">(${esc(sr.account_id)})</span>`).join('<br/>') : '<span style="color:var(--ink2)">Yok</span>'}
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('inspectorModal').style.display = 'flex';
+    }
+
+    function closeInspector() {
+      document.getElementById('inspectorModal').style.display = 'none';
+    }
+
+    // ========================================================================
+    // 7. ADMIN ACTIONS (GIVE FLAKES, TOGGLE VIP, VOICE UPLOAD, DELETE)
+    // ========================================================================
+    async function fetchFreshProfileJson(accountId, fallbackJson) {
+      try {
+        const { data } = await sb
+          .from('profiles')
+          .select('profile_json')
+          .eq('account_id', accountId)
+          .maybeSingle();
+        if (data && data.profile_json) {
+          const { photos: _p, voiceUri: _v, verifiedSelfieUri: _s, ...clean } = data.profile_json;
+          return clean;
+        }
+      } catch {}
+      const { photos: _p, voiceUri: _v, verifiedSelfieUri: _s, ...clean } = fallbackJson || {};
+      return clean;
+    }
+
+    async function giveFlakes(accId, addCount) {
+      const row = profileByKey.get(accId.toLowerCase());
+      if (!row) return;
+      const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+      const cs = pj._cloudState || {};
+      const next = (typeof cs.flakesRemaining === 'number' ? cs.flakesRemaining : 0) + addCount;
+      const nowVer = Date.now();
+      const updatedJson = {
+        ...pj,
+        _cloudState: {
+          ...cs,
+          flakesRemaining: next,
+          adminOverrideFlakes: next,
+          adminOverrideVersion: nowVer,
+        },
+      };
+      const { error } = await sb.from('profiles').update({
+        profile_json: updatedJson,
+        updated_at: new Date().toISOString(),
+      }).eq('account_id', row.account_id);
+      if (error) {
+        showToast('Hata: ' + error.message);
+        return;
+      }
+      row.profile_json = updatedJson;
+      rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+      showToast(`${row.display_name} hesabına +${addCount} Kar Tanesi eklendi (Toplam: ${next})!`);
+      await loadAllData();
+    }
+
+    async function togglePro(accId, makePro) {
+      const row = profileByKey.get(accId.toLowerCase());
+      if (!row) return;
+      const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+      const cs = pj._cloudState || {};
+      const nowVer = Date.now();
+      const updatedJson = {
+        ...pj,
+        _cloudState: {
+          ...cs,
+          adminOverridePro: Boolean(makePro),
+          adminOverrideVersion: nowVer,
+          directMessagesRemaining: makePro ? Math.max(cs.directMessagesRemaining || 0, 5) : 0,
+          boostsRemaining: makePro ? Math.max(cs.boostsRemaining || 0, 3) : 0,
+          icebreakersRemaining: makePro ? Math.max(cs.icebreakersRemaining || 0, 5) : 0,
+        },
+      };
+      const { error } = await sb.from('profiles').update({
+        is_pro: Boolean(makePro),
+        profile_json: updatedJson,
+        updated_at: new Date().toISOString(),
+      }).eq('account_id', row.account_id);
+      if (error) {
+        showToast('Hata: ' + error.message);
+        return;
+      }
+      row.is_pro = Boolean(makePro);
+      row.profile_json = updatedJson;
+      rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+      showToast(`${row.display_name} ${makePro ? '⭐ FROST+ VIP yapıldı!' : 'Standart üyeliğe alındı!'}`);
+      await loadAllData();
+    }
+
+    async function resetSwipes(accId) {
+      const row = profileByKey.get(accId.toLowerCase());
+      if (!row) return;
+      const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+      const cs = pj._cloudState || {};
+      const nowVer = Date.now();
+      const updatedJson = {
+        ...pj,
+        _cloudState: {
+          ...cs,
+          passedIds: [],
+          adminOverrideResetPassedAt: nowVer,
+          adminOverrideVersion: nowVer,
+        },
+      };
+      const { error } = await sb.from('profiles').update({
+        profile_json: updatedJson,
+        updated_at: new Date().toISOString(),
+      }).eq('account_id', row.account_id);
+      if (error) {
+        showToast('Hata: ' + error.message);
+        return;
+      }
+      row.profile_json = updatedJson;
+      rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+      showToast(`${row.display_name} için geçilen profiller sıfırlandı!`);
+      await loadAllData();
+    }
+
+    async function uploadVoiceFor(accId) {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = 'audio/*';
+      inp.onchange = async () => {
+        const file = inp.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = reader.result;
+          const row = profileByKey.get(accId.toLowerCase());
+          if (!row) return;
+          const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+          const updatedJson = { ...pj, voiceRecorded: true, voiceDurationSec: 5 };
+          const nowIso = new Date().toISOString();
+          const { error } = await sb.from('profiles').update({
+            voice_uri: dataUrl,
+            profile_json: updatedJson,
+            updated_at: nowIso,
+          }).eq('account_id', row.account_id);
+          if (error) {
+            showToast('Hata: ' + error.message);
+            return;
+          }
+          row.voice_uri = dataUrl;
+          row.profile_json = updatedJson;
+          row.updated_at = nowIso;
+          rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+          showToast(`${row.display_name} için gerçek ses dosyası yüklendi!`);
+          await loadAllData();
+        };
+        reader.readAsDataURL(file);
+      };
+      inp.click();
+    }
+
+    async function clearVoiceFor(accId) {
+      const row = profileByKey.get(accId.toLowerCase());
+      if (!row) return;
+      const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+      const updatedJson = { ...pj, voiceRecorded: false, voiceDurationSec: 0 };
+      const nowIso = new Date().toISOString();
+      const { error } = await sb.from('profiles').update({
+        voice_uri: null,
+        profile_json: updatedJson,
+        updated_at: nowIso,
+      }).eq('account_id', row.account_id);
+      if (error) {
+        showToast('Hata: ' + error.message);
+        return;
+      }
+      row.voice_uri = null;
+      row.profile_json = updatedJson;
+      row.updated_at = nowIso;
+      rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+      showToast(`${row.display_name} ses kaydı kaldırıldı.`);
+      await loadAllData();
+    }
+
+    async function deleteUser(accId) {
+      if (!confirm(`${accId} hesabını kalıcı olarak silmek istediğine emin misin?`)) return;
+      await sb.from('profiles').delete().eq('account_id', accId);
+      rawRowsByAccountMap.delete(String(accId || '').toLowerCase());
+      showToast(`${accId} silindi.`);
+      loadAllData(true);
+    }
+
+    let pollTimerId = null;
+
+    function startAdminSync() {
+      loadAllData();
+      if (!pollTimerId) {
+        pollTimerId = setInterval(loadAllData, 10000);
+      }
+    }
+
+    function unlockAdminPanel() {
+      const val = (document.getElementById('adminPinInput').value || '').trim();
+      if (val === 'frost2026' || val === 'okyanus2026' || val === '1453') {
+        localStorage.setItem('frost_admin_unlocked_v1', '1');
+        document.getElementById('adminLockScreen').style.display = 'none';
+        startAdminSync();
+      } else {
+        document.getElementById('adminPinError').style.display = 'block';
+      }
+    }
+
+    (function initAdminAccess() {
+      const isLocal =
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1';
+      const isUnlocked = localStorage.getItem('frost_admin_unlocked_v1') === '1';
+      if (isLocal || isUnlocked) {
+        document.getElementById('adminLockScreen').style.display = 'none';
+        startAdminSync();
+      } else {
+        document.getElementById('adminLockScreen').style.display = 'flex';
+      }
+    })();
+  </script>
+</body>
+</html>
