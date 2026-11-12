@@ -698,7 +698,26 @@
             const targetProf = resolveProfile(targetRaw);
             const tShort = shortIdOf(targetProf.account_id || targetRaw);
             if (!incomingLikesMap.has(tShort)) incomingLikesMap.set(tShort, []);
-            incomingLikesMap.get(tShort).push(sender);
+            const arr = incomingLikesMap.get(tShort);
+            if (!arr.some(s => s.account_id === sender.account_id)) {
+              arr.push(sender);
+            }
+          });
+        }
+      });
+
+      allProfiles.forEach(receiver => {
+        const recLikes = receiver.profile_json?._cloudState?.receivedLikes || [];
+        if (Array.isArray(recLikes)) {
+          const tShort = shortIdOf(receiver.account_id);
+          recLikes.forEach(senderRaw => {
+            const senderProf = resolveProfile(senderRaw);
+            if (!senderProf || !senderProf.account_id) return;
+            if (!incomingLikesMap.has(tShort)) incomingLikesMap.set(tShort, []);
+            const arr = incomingLikesMap.get(tShort);
+            if (!arr.some(s => s.account_id === senderProf.account_id)) {
+              arr.push(senderProf);
+            }
           });
         }
       });
