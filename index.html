@@ -1345,6 +1345,7 @@
       const recChats = { ...(recCs.chats || {}) };
       const existingRecThread = recChats[senderShort] || {
         profileId: senderShort,
+        partnerName: senderRow.display_name || 'FROST Üyesi',
         temp: -12,
         melted: false,
         msgs: [],
@@ -1352,6 +1353,7 @@
       const nextTemp = existingRecThread.melted ? 0 : Math.min(0, (existingRecThread.temp ?? -12) + 2);
       recChats[senderShort] = {
         ...existingRecThread,
+        partnerName: senderRow.display_name || existingRecThread.partnerName || 'FROST Üyesi',
         temp: nextTemp,
         awaitingFirstReply: false,
         unreadCount: (existingRecThread.unreadCount || 0) + 1,
@@ -1370,9 +1372,16 @@
         const sJson = senderRow.profile_json || {};
         const sCs = sJson._cloudState || {};
         const sChats = { ...(sCs.chats || {}) };
-        const exS = sChats[recipientShort] || { profileId: recipientShort, temp: nextTemp, melted: false, msgs: [] };
+        const exS = sChats[recipientShort] || {
+          profileId: recipientShort,
+          partnerName: recipientRow.display_name || 'FROST Üyesi',
+          temp: nextTemp,
+          melted: false,
+          msgs: [],
+        };
         sChats[recipientShort] = {
           ...exS,
+          partnerName: recipientRow.display_name || exS.partnerName || 'FROST Üyesi',
           temp: nextTemp,
           awaitingFirstReply: false,
           msgs: [
