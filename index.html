@@ -626,92 +626,117 @@
     }
 
     let lastMaxUpdatedAt = '';
+    let adminPollTick = 0;
+    let isLoadingData = false;
 
     async function loadAllData(forceFull = false) {
-      document.getElementById('syncStatus').textContent = 'Yenileniyor...';
-      const isInitial = forceFull || rawRowsByAccountMap.size === 0 || !lastMaxUpdatedAt;
-      const selectCols = isInitial
-        ? '*'
-        : 'account_id,email,display_name,age,gender,city,height,weight,zodiac,tags,prompt_question,prompt_answer,is_verified,is_pro,has_completed_onboarding,profile_json,created_at,updated_at';
+      if (isLoadingData) return;
+      isLoadingData = true;
+      try {
+        adminPollTick += 1;
+        document.getElementById('syncStatus').textContent = 'Yenileniyor...';
+        const isInitial = forceFull || rawRowsByAccountMap.size === 0 || !lastMaxUpdatedAt;
+        const selectCols =
+          'account_id,email,display_name,age,gender,city,height,weight,zodiac,tags,prompt_question,prompt_answer,is_verified,is_pro,has_completed_onboarding,profile_json,created_at,updated_at';
 
-      let query = sb
-        .from('profiles')
-        .select(selectCols)
-        .order('updated_at', { ascending: false })
-        .limit(1000);
-
-      if (!isInitial && lastMaxUpdatedAt) {
-        query = query.gt('updated_at', lastMaxUpdatedAt);
-      }
-
-      const { data: rows, error } = await query;
-
-      if (error) {
-        document.getElementById('syncStatus').textContent = 'Bağlantı hatası!';
-        return;
-      }
-
-      if (!isInitial && Array.isArray(rows) && rows.length === 0) {
-        document.getElementById('syncStatus').textContent =
-          'Canlı Bağlı • ' + new Date().toLocaleTimeString('tr-TR');
-        return;
-      }
-
-      const { data: repRows } = await sb
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      allReports = repRows || [];
-
-      const missingMediaAccounts = [];
-      if (Array.isArray(rows)) {
-        rows.forEach(r => {
-          if (r.updated_at && String(r.updated_at) > lastMaxUpdatedAt) {
-            lastMaxUpdatedAt = String(r.updated_at);
-          }
-          const k = String(r.account_id || '').toLowerCase();
-          if (!k) return;
-          const prev = rawRowsByAccountMap.get(k);
-          if (prev && !isInitial) {
-            const updatedChanged = Boolean(r.updated_at) && r.updated_at !== prev.updated_at;
-            rawRowsByAccountMap.set(k, {
-              ...prev,
-              ...r,
-              photos: Array.isArray(r.photos) ? r.photos : prev.photos,
-              voice_uri: 'voice_uri' in r ? r.voice_uri : prev.voice_uri,
-            });
-            if (updatedChanged && !('voice_uri' in r)) {
-              missingMediaAccounts.push(r.account_id);
-            }
-          } else {
-            rawRowsByAccountMap.set(k, r);
-            if (!isInitial && !Array.isArray(r.photos)) {
-              missingMediaAccounts.push(r.account_id);
-            }
-          }
-        });
-      }
-
-      if (missingMediaAccounts.length > 0) {
-        const { data: mediaRows } = await sb
+        let query = sb
           .from('profiles')
-          .select('account_id,photos,voice_uri')
-          .in('account_id', missingMediaAccounts);
-        if (Array.isArray(mediaRows)) {
-          mediaRows.forEach(mr => {
-            const k = String(mr.account_id || '').toLowerCase();
-            const cur = rawRowsByAccountMap.get(k);
-            if (cur) {
+          .select(selectCols)
+          .order('updated_at', { ascending: false })
+          .limit(500);
+
+        if (!isInitial && lastMaxUpdatedAt) {
+          query = query.gt('updated_at', lastMaxUpdatedAt);
+        }
+
+        const { data: rows, error } = await query;
+
+        if (error) {
+          document.getElementById('syncStatus').textContent = 'Bağlantı bekleniyor (' + (error.code || 'kota/ağ') + ')';
+          return;
+        }
+
+        // Only poll `reports` on initial load, manual refresh, or every 3rd cycle to save egress
+        if (isInitial || adminPollTick % 3 === 0) {
+          const { data: repRows } = await sb
+            .from('reports')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(80);
+          if (Array.isArray(repRows)) {
+            allReports = repRows;
+          }
+        }
+
+        if (!isInitial && Array.isArray(rows) && rows.length === 0) {
+          if (adminPollTick % 3 === 0) {
+            buildSupportThreads();
+            updateKPIs();
+            renderSupportThreads();
+            renderReports();
+          }
+          document.getElementById('syncStatus').textContent =
+            'Canlı Bağlı • ' + new Date().toLocaleTimeString('tr-TR');
+          return;
+        }
+
+        const missingMediaAccounts = [];
+        if (Array.isArray(rows)) {
+          rows.forEach(r => {
+            if (r.updated_at && String(r.updated_at) > lastMaxUpdatedAt) {
+              lastMaxUpdatedAt = String(r.updated_at);
+            }
+            const k = String(r.account_id || '').toLowerCase();
+            if (!k) return;
+            const isBotSeed = k.endsWith('@frost.app') || k.startsWith('seed_');
+            const hasVoice = Boolean(r.profile_json?.voiceRecorded);
+            const prev = rawRowsByAccountMap.get(k);
+            if (prev && !forceFull) {
+              const voiceFlagChanged =
+                Boolean(r.profile_json?.voiceRecorded) !==
+                Boolean(prev.profile_json?.voiceRecorded);
               rawRowsByAccountMap.set(k, {
-                ...cur,
-                photos: mr.photos || [],
-                voice_uri: mr.voice_uri || null,
+                ...prev,
+                ...r,
+                photos: Array.isArray(r.photos) ? r.photos : prev.photos,
+                voice_uri: 'voice_uri' in r ? r.voice_uri : prev.voice_uri,
               });
+              // NEVER re-download heavy Base64 photos/voice on chat message updates — only if missing or voice changed!
+              if ((!Array.isArray(prev.photos) && !isBotSeed) || voiceFlagChanged) {
+                missingMediaAccounts.push(r.account_id);
+              }
+            } else {
+              rawRowsByAccountMap.set(k, r);
+              if (!Array.isArray(r.photos) && (!isBotSeed || hasVoice)) {
+                missingMediaAccounts.push(r.account_id);
+              }
             }
           });
         }
-      }
+
+        if (missingMediaAccounts.length > 0) {
+          const chunkSize = 15;
+          for (let ci = 0; ci < missingMediaAccounts.length; ci += chunkSize) {
+            const chunk = missingMediaAccounts.slice(ci, ci + chunkSize);
+            const { data: mediaRows } = await sb
+              .from('profiles')
+              .select('account_id,photos,voice_uri')
+              .in('account_id', chunk);
+            if (Array.isArray(mediaRows)) {
+              mediaRows.forEach(mr => {
+                const k = String(mr.account_id || '').toLowerCase();
+                const cur = rawRowsByAccountMap.get(k);
+                if (cur) {
+                  rawRowsByAccountMap.set(k, {
+                    ...cur,
+                    photos: mr.photos || [],
+                    voice_uri: mr.voice_uri || null,
+                  });
+                }
+              });
+            }
+          }
+        }
 
       const mergedRows = Array.from(rawRowsByAccountMap.values()).sort((a, b) =>
         String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
@@ -769,8 +794,11 @@
       renderLikes();
       renderReports();
 
-      const nowStr = new Date().toLocaleTimeString('tr-TR');
-      document.getElementById('syncStatus').textContent = 'Canlı • Son güncelleme ' + nowStr;
+        const nowStr = new Date().toLocaleTimeString('tr-TR');
+        document.getElementById('syncStatus').textContent = 'Canlı • Son güncelleme ' + nowStr;
+      } finally {
+        isLoadingData = false;
+      }
     }
 
     function buildSupportThreads() {
@@ -1931,7 +1959,7 @@
       await sb.from('profiles').delete().eq('account_id', accId);
       rawRowsByAccountMap.delete(String(accId || '').toLowerCase());
       showToast(`${accId} silindi.`);
-      loadAllData(true);
+      loadAllData(false);
     }
 
     let pollTimerId = null;
@@ -1939,7 +1967,17 @@
     function startAdminSync() {
       loadAllData();
       if (!pollTimerId) {
-        pollTimerId = setInterval(loadAllData, 10000);
+        // Egress-safe polling: ONLY poll when the browser tab is actively visible (0 KB used in background tabs!)
+        pollTimerId = setInterval(() => {
+          if (!document.hidden) {
+            loadAllData(false);
+          }
+        }, 20000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            loadAllData(false);
+          }
+        });
       }
     }
 
