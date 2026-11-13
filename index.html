@@ -55,6 +55,10 @@
     .btn-primary { background: var(--cold); color: #041019; border-color: var(--cold); font-weight: 800; }
     .btn-primary:hover { background: #bae6fd; }
     .btn-green { background: rgba(52, 211, 153, 0.18); color: var(--green); border-color: rgba(52, 211, 153, 0.45); }
+    .btn-plus { background: rgba(125, 211, 252, 0.16); color: var(--cold); border-color: rgba(125, 211, 252, 0.45); }
+    .btn-plus:hover { background: rgba(125, 211, 252, 0.28); }
+    .btn-vip { background: rgba(251, 191, 36, 0.18); color: var(--amber); border-color: rgba(251, 191, 36, 0.5); }
+    .btn-vip:hover { background: rgba(251, 191, 36, 0.3); }
     .btn-danger { border-color: rgba(251, 113, 133, 0.4); color: var(--danger); }
     .btn-danger:hover { background: rgba(251, 113, 133, 0.15); }
 
@@ -108,6 +112,8 @@
     .badge-seed { background: rgba(125, 211, 252, 0.12); color: var(--cold); border: 1px solid rgba(125, 211, 252, 0.25); }
     .badge-fake { background: rgba(192, 132, 252, 0.16); color: var(--purple); border: 1px solid rgba(192, 132, 252, 0.38); }
     .badge-pro { background: rgba(251, 191, 36, 0.18); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge-vip { background: linear-gradient(135deg, rgba(251, 191, 36, 0.26), rgba(245, 158, 11, 0.18)); color: #fde68a; border: 1px solid rgba(251, 191, 36, 0.55); }
+    .badge-plus { background: rgba(125, 211, 252, 0.18); color: var(--cold); border: 1px solid rgba(125, 211, 252, 0.45); }
     .badge-urgent { background: rgba(251, 113, 133, 0.22); color: var(--danger); border: 1px solid rgba(251, 113, 133, 0.5); }
 
     .messages-area { flex: 1; padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; max-height: 520px; }
@@ -523,6 +529,37 @@
 
     function isRealUser(row) {
       return !isFakeAccount(row) && !isHiddenTestAccount(row);
+    }
+
+    function getUserTier(row) {
+      const cs = row?.profile_json?._cloudState || {};
+      const explicit = cs.adminOverrideTier || cs.proTier;
+      if (explicit === 'vip' || explicit === 'plus' || explicit === 'free') {
+        if (!row?.is_pro && explicit !== 'free' && cs.adminOverridePro === false) return 'free';
+        return explicit;
+      }
+      if (typeof cs.adminOverridePro === 'boolean') {
+        return cs.adminOverridePro ? 'vip' : 'free';
+      }
+      return row?.is_pro ? 'vip' : 'free';
+    }
+
+    function dispatchRemotePushToCs(cs, title, body, data = {}) {
+      try {
+        const pushMap = cs && typeof cs.pushDevices === 'object' ? cs.pushDevices : null;
+        if (!pushMap) return;
+        const devices = Object.values(pushMap).filter(Boolean);
+        if (!devices.length) return;
+        fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ devices, title, body, data }),
+        }).catch(() => {});
+      } catch {}
     }
 
     function cleanPhoto(uri) {
@@ -1036,8 +1073,15 @@
         updated_at: new Date().toISOString(),
       }).eq('account_id', row.account_id);
 
+      dispatchRemotePushToCs(
+        cs,
+        '🎧 FROST Destek Ekibi Yanıtladı',
+        text.length > 90 ? text.slice(0, 88) + '…' : text,
+        { type: 'support' }
+      );
+
       inp.value = '';
-      showToast('Yanıt gönderildi! Kullanıcının uygulamasına bildirim olarak düşecek.');
+      showToast('Yanıt gönderildi! Kullanıcının telefonuna anlık bildirim iletildi.');
       await loadAllData();
     }
 
@@ -1047,7 +1091,12 @@
     function buildUserCardHtml(r, isFakeTab) {
       const cs = r.profile_json?._cloudState || {};
       const devMeta = cs.deviceMeta || {};
+      const tier = getUserTier(r);
+      const isProTier = tier === 'vip' || tier === 'plus';
       const flakes = typeof cs.flakesRemaining === 'number' ? cs.flakesRemaining : 15;
+      const boosts = typeof cs.boostsRemaining === 'number' ? cs.boostsRemaining : (tier === 'vip' ? 3 : tier === 'plus' ? 1 : 0);
+      const icebreakers = typeof cs.icebreakersRemaining === 'number' ? cs.icebreakersRemaining : (tier === 'vip' ? 5 : tier === 'plus' ? 3 : 0);
+      const dms = typeof cs.directMessagesRemaining === 'number' ? cs.directMessagesRemaining : (tier === 'vip' ? 5 : 0);
       const likesSent = Array.isArray(cs.sentLikes) ? cs.sentLikes.length : 0;
       const sh = shortIdOf(r.account_id);
       const likesReceived = (incomingLikesMap.get(sh) || []).length;
@@ -1079,7 +1128,8 @@
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <strong style="font-size: 15.5px;">${esc(r.display_name || 'İsimsiz')}, ${esc(r.age || '-')}</strong>
                 <span class="badge ${isFakeTab ? 'badge-fake' : 'badge-real'}">${isFakeTab ? '🤖 FAKE / SİSTEM' : '👤 GERÇEK ÜYE'}</span>
-                ${r.is_pro ? '<span class="badge badge-pro">FROST+ / VIP</span>' : ''}
+                ${tier === 'vip' ? '<span class="badge badge-vip">👑 FROST VIP</span>' : tier === 'plus' ? '<span class="badge badge-plus">⭐ FROST+</span>' : ''}
+                ${cs.invisibleMode ? '<span class="badge badge-seed">👻 Gizli Mod</span>' : ''}
                 ${supportCnt > 0 ? `<span class="badge badge-urgent">🎧 ${supportCnt} Ticket</span>` : ''}
               </div>
               <div style="font-size: 12px; color: var(--ink2); margin-top: 3px; word-break: break-all;">${esc(r.account_id)}</div>
@@ -1094,7 +1144,10 @@
           </div>
 
           <div class="meta-pills">
-            ${!isFakeTab ? `<span class="meta-pill">❄ Hak: <b>${r.is_pro ? '∞' : flakes}</b></span>` : ''}
+            ${!isFakeTab ? `<span class="meta-pill">❄ Hak: <b>${isProTier ? '∞' : flakes}</b></span>` : ''}
+            ${!isFakeTab ? `<span class="meta-pill">⚡ Buz Kıran: <b>${icebreakers}</b></span>` : ''}
+            ${!isFakeTab ? `<span class="meta-pill">🔦 Boost: <b>${boosts}</b></span>` : ''}
+            ${!isFakeTab ? `<span class="meta-pill">💌 İlk Msj: <b>${dms}</b></span>` : ''}
             <span class="meta-pill">📤 Attığı Like: <b>${likesSent}</b></span>
             <span class="meta-pill">📥 Aldığı Like: <b>${likesReceived}</b></span>
             ${!isFakeTab ? `<span class="meta-pill">✕ Geçtiği: <b>${passedCnt}</b></span>` : ''}
@@ -1107,8 +1160,12 @@
 
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
             <button class="btn btn-primary" onclick="openUserInspector('${esc(r.account_id)}')">🔍 Tüm Hareketleri & DM</button>
+            ${!isFakeTab && tier !== 'plus' ? `<button class="btn btn-plus" onclick="setUserTier('${esc(r.account_id)}', 'plus')">⭐ FROST+ Ver</button>` : ''}
+            ${!isFakeTab && tier !== 'vip' ? `<button class="btn btn-vip" onclick="setUserTier('${esc(r.account_id)}', 'vip')">👑 FROST VIP Ver</button>` : ''}
+            ${!isFakeTab && tier !== 'free' ? `<button class="btn btn-danger" onclick="setUserTier('${esc(r.account_id)}', 'free')">✕ VIP Kaldır</button>` : ''}
+            ${!isFakeTab ? `<button class="btn" onclick="giveUserBonusPack('${esc(r.account_id)}', 'icebreaker')">⚡ +5 Buz Kıran</button>` : ''}
+            ${!isFakeTab ? `<button class="btn" onclick="giveUserBonusPack('${esc(r.account_id)}', 'boost')">🔦 +3 Boost</button>` : ''}
             ${!isFakeTab ? `<button class="btn" onclick="giveFlakes('${esc(r.account_id)}', 15)">+15 Hak</button>` : ''}
-            ${!isFakeTab ? `<button class="btn" onclick="togglePro('${esc(r.account_id)}', ${!r.is_pro})">${r.is_pro ? 'VIP Kapat' : 'VIP Yap'}</button>` : ''}
             <button class="btn" onclick="uploadVoiceFor('${esc(r.account_id)}')">🎤 Ses Yükle</button>
             ${hasAnyVoice ? `<button class="btn" onclick="clearVoiceFor('${esc(r.account_id)}')">Sesi Kaldır</button>` : ''}
             ${!isFakeTab ? `<button class="btn" onclick="resetSwipes('${esc(r.account_id)}')">Geçmeleri Sıfırla</button>` : ''}
@@ -1368,6 +1425,13 @@
         updated_at: nowIso,
       }).eq('account_id', recipientRow.account_id);
 
+      dispatchRemotePushToCs(
+        recCs,
+        `${senderRow.display_name || 'FROST Üyesi'} mesaj gönderdi ❄️`,
+        text.length > 90 ? text.slice(0, 88) + '…' : text,
+        { type: 'message', profileId: senderShort }
+      );
+
       if (senderRow.id) {
         const sJson = senderRow.profile_json || {};
         const sCs = sJson._cloudState || {};
@@ -1511,6 +1575,7 @@
 
       const sh = shortIdOf(u.account_id);
       const cs = u.profile_json?._cloudState || {};
+      const uTier = getUserTier(u);
       const devMeta = cs.deviceMeta || {};
       const sentLikes = Array.isArray(cs.sentLikes) ? cs.sentLikes : [];
       const receivedFrom = incomingLikesMap.get(sh) || [];
@@ -1524,9 +1589,12 @@
         `${u.display_name || u.account_id} (${u.account_id}) — Tüm Hareket Özeti`;
 
       document.getElementById('inspectorBody').innerHTML = `
-        <div style="display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; background:var(--bg); padding:14px; border-radius:16px; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; background:var(--bg); padding:14px; border-radius:16px; border:1px solid var(--border); align-items:center;">
           <div>
-            <div style="font-size:17px; font-weight:900;">${esc(u.display_name || '-')}, ${esc(u.age || '-')} (${esc(u.gender || '-')})</div>
+            <div style="font-size:17px; font-weight:900; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span>${esc(u.display_name || '-')}, ${esc(u.age || '-')} (${esc(u.gender || '-')})</span>
+              ${uTier === 'vip' ? '<span class="badge badge-vip">👑 FROST VIP</span>' : uTier === 'plus' ? '<span class="badge badge-plus">⭐ FROST+</span>' : '<span class="badge">Standart</span>'}
+            </div>
             <div style="font-size:12.5px; color:var(--cold); margin-top:3px;">Hesap: ${esc(u.account_id)} • Şehir: ${esc(u.city || '-')}</div>
             <div style="font-size:12px; color:var(--ink2); margin-top:4px;">
               Cihaz: <b>${esc(devMeta.deviceSummary || '-')}</b> • Cihaz ID: <code style="color:var(--cold)">${esc(devMeta.deviceId || '-')}</code>
@@ -1534,6 +1602,13 @@
             <div style="font-size:12px; color:var(--ink2); margin-top:2px;">
               Kayıt: ${formatDateTime(u.created_at)} • Son İşlem: ${formatDateTime(devMeta.lastActiveAt || u.updated_at)}
             </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${uTier !== 'plus' ? `<button class="btn btn-plus" onclick="setUserTier('${esc(u.account_id)}', 'plus').then(() => openUserInspector('${esc(u.account_id)}'))">⭐ FROST+ Ver</button>` : ''}
+            ${uTier !== 'vip' ? `<button class="btn btn-vip" onclick="setUserTier('${esc(u.account_id)}', 'vip').then(() => openUserInspector('${esc(u.account_id)}'))">👑 FROST VIP Ver</button>` : ''}
+            ${uTier !== 'free' ? `<button class="btn btn-danger" onclick="setUserTier('${esc(u.account_id)}', 'free').then(() => openUserInspector('${esc(u.account_id)}'))">✕ VIP Kaldır</button>` : ''}
+            <button class="btn" onclick="giveUserBonusPack('${esc(u.account_id)}', 'icebreaker').then(() => openUserInspector('${esc(u.account_id)}'))">⚡ +5 Buz Kıran</button>
+            <button class="btn" onclick="giveUserBonusPack('${esc(u.account_id)}', 'boost').then(() => openUserInspector('${esc(u.account_id)}'))">🔦 +3 Boost</button>
           </div>
         </div>
 
@@ -1649,25 +1724,48 @@
       await loadAllData();
     }
 
-    async function togglePro(accId, makePro) {
+    async function setUserTier(accId, targetTier) {
       const row = profileByKey.get(accId.toLowerCase());
       if (!row) return;
       const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
       const cs = pj._cloudState || {};
       const nowVer = Date.now();
+      const makePro = targetTier === 'plus' || targetTier === 'vip';
+      const curFlakes = typeof cs.flakesRemaining === 'number' ? cs.flakesRemaining : 15;
+      const curDms = typeof cs.directMessagesRemaining === 'number' ? cs.directMessagesRemaining : 0;
+      const curBoosts = typeof cs.boostsRemaining === 'number' ? cs.boostsRemaining : 0;
+      const curIce = typeof cs.icebreakersRemaining === 'number' ? cs.icebreakersRemaining : 0;
+
+      const nextCs = {
+        ...cs,
+        proTier: targetTier,
+        adminOverrideTier: targetTier,
+        adminOverridePro: makePro,
+        adminOverrideVersion: nowVer,
+        flakesRemaining: makePro ? Math.max(curFlakes, 15) : curFlakes,
+        directMessagesRemaining:
+          targetTier === 'vip' ? Math.max(curDms, 5) : targetTier === 'plus' ? curDms : 0,
+        boostsRemaining:
+          targetTier === 'vip'
+            ? Math.max(curBoosts, 3)
+            : targetTier === 'plus'
+            ? Math.max(curBoosts, 1)
+            : 0,
+        icebreakersRemaining:
+          targetTier === 'vip'
+            ? Math.max(curIce, 5)
+            : targetTier === 'plus'
+            ? Math.max(curIce, 3)
+            : 0,
+        ...(makePro ? {} : { invisibleMode: false }),
+      };
+
       const updatedJson = {
         ...pj,
-        _cloudState: {
-          ...cs,
-          adminOverridePro: Boolean(makePro),
-          adminOverrideVersion: nowVer,
-          directMessagesRemaining: makePro ? Math.max(cs.directMessagesRemaining || 0, 5) : 0,
-          boostsRemaining: makePro ? Math.max(cs.boostsRemaining || 0, 3) : 0,
-          icebreakersRemaining: makePro ? Math.max(cs.icebreakersRemaining || 0, 5) : 0,
-        },
+        _cloudState: nextCs,
       };
       const { error } = await sb.from('profiles').update({
-        is_pro: Boolean(makePro),
+        is_pro: makePro,
         profile_json: updatedJson,
         updated_at: new Date().toISOString(),
       }).eq('account_id', row.account_id);
@@ -1675,11 +1773,69 @@
         showToast('Hata: ' + error.message);
         return;
       }
-      row.is_pro = Boolean(makePro);
+      row.is_pro = makePro;
       row.profile_json = updatedJson;
       rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
-      showToast(`${row.display_name} ${makePro ? '⭐ FROST+ VIP yapıldı!' : 'Standart üyeliğe alındı!'}`);
+
+      if (targetTier === 'vip') {
+        dispatchRemotePushToCs(
+          nextCs,
+          '👑 FROST VIP Aktif!',
+          'Hesabına tüm FROST VIP ayrıcalıkları, 3 Kutup Işığı, 5 Buz Kıran ve 5 Direkt İlk Mesaj tanımlandı!',
+          { type: 'vip' }
+        );
+        showToast(`${row.display_name} 👑 FROST VIP yapıldı! (3 Boost + 5 Buz Kıran + 5 İlk Msj)`);
+      } else if (targetTier === 'plus') {
+        dispatchRemotePushToCs(
+          nextCs,
+          '⭐ FROST+ Aktif!',
+          'Hesabına sınırsız beğeni, 1 Kutup Işığı ve 3 Özel Buz Kıran hakkı tanımlandı!',
+          { type: 'vip' }
+        );
+        showToast(`${row.display_name} ⭐ FROST+ yapıldı! (1 Boost + 3 Buz Kıran)`);
+      } else {
+        showToast(`${row.display_name} Standart üyeliğe alındı!`);
+      }
       await loadAllData();
+    }
+
+    async function giveUserBonusPack(accId, kind) {
+      const row = profileByKey.get(accId.toLowerCase());
+      if (!row) return;
+      const pj = await fetchFreshProfileJson(row.account_id, row.profile_json);
+      const cs = pj._cloudState || {};
+      const nowVer = Date.now();
+      const nextCs = {
+        ...cs,
+        adminOverrideVersion: nowVer,
+      };
+      let label = '';
+      if (kind === 'icebreaker') {
+        const nextVal = (typeof cs.icebreakersRemaining === 'number' ? cs.icebreakersRemaining : 0) + 5;
+        nextCs.icebreakersRemaining = nextVal;
+        label = `+5 Özel Buz Kıran eklendi (Toplam: ${nextVal})`;
+      } else {
+        const nextVal = (typeof cs.boostsRemaining === 'number' ? cs.boostsRemaining : 0) + 3;
+        nextCs.boostsRemaining = nextVal;
+        label = `+3 Kutup Işığı Boost eklendi (Toplam: ${nextVal})`;
+      }
+      const updatedJson = { ...pj, _cloudState: nextCs };
+      const { error } = await sb.from('profiles').update({
+        profile_json: updatedJson,
+        updated_at: new Date().toISOString(),
+      }).eq('account_id', row.account_id);
+      if (error) {
+        showToast('Hata: ' + error.message);
+        return;
+      }
+      row.profile_json = updatedJson;
+      rawRowsByAccountMap.set(String(row.account_id).toLowerCase(), row);
+      showToast(`${row.display_name}: ${label}!`);
+      await loadAllData();
+    }
+
+    async function togglePro(accId, makePro) {
+      return setUserTier(accId, makePro ? 'vip' : 'free');
     }
 
     async function resetSwipes(accId) {
